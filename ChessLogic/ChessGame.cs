@@ -7,8 +7,120 @@ namespace ChessLogic
 {
     public class ChessGame
     {
-        private ChessBoard Board;
+        private readonly ChessBoard Board;
+        public ChessGameState State;
 
+        public ChessGame(string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+        {
+            Board = new ChessBoard(fen);
+            State = new ChessGameState(fen);
+        }
+
+        public Figure getFigureAt(int x, int y)
+        {
+            Vector2 position = new Vector2(x, y);
+            ChessBoardCell cell = Board.GetCellByPosition(position);
+            return cell.Figure;
+        }
+
+        public List<string> getAvailableMoves()
+        {
+            List<string> result = new List<string>();
+
+            foreach (KeyValuePair<Vector2, ChessBoardCell> pair in Board.Cells)
+            {
+                Figure figure = pair.Value.Figure;
+                Vector2 position = pair.Key;
+
+                if (figure != null)
+                {
+                    if(figure.Color != State.TurnOwner)
+                    {
+                        continue;
+                    }
+
+                    switch (figure.Type)
+                    {
+                        case FigureType.Pawn:
+
+                            int direction = figure.Color == Color.White ? 1 : -1;
+                            bool pawnIsOnStartPosition = figure.Color == Color.White ? position.Y == 1 : position.Y == 6;
+
+                            Vector2 frontDirection = new Vector2(0, direction);
+                            Vector2 frontPassDirection = new Vector2(0, direction * 2);
+                            Vector2 frontRightDirection = new Vector2(1, direction);
+                            Vector2 fronLeftDirection = new Vector2(-1, direction);
+
+                            ChessBoardCell endPointfrontDirection = Board.GetCellByPosition(position + frontDirection);
+                            ChessBoardCell endPointfrontPassDirection = Board.GetCellByPosition(position + frontPassDirection);
+                            ChessBoardCell endPointfrontRightDirection = Board.GetCellByPosition(position + frontRightDirection);
+                            ChessBoardCell endPointfronLeftDirection = Board.GetCellByPosition(position + fronLeftDirection);
+
+                            if (endPointfrontDirection != null && endPointfrontDirection.Figure == null)
+                            {
+                                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointfrontDirection.Position));
+                            }
+
+                            if (endPointfrontRightDirection != null && endPointfrontRightDirection.Figure != null && endPointfrontRightDirection.Figure.Color != figure.Color)
+                            {
+                                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointfrontRightDirection.Position));
+                            }
+
+                            if (endPointfronLeftDirection != null && endPointfronLeftDirection.Figure != null && endPointfronLeftDirection.Figure.Color != figure.Color)
+                            {
+                                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointfronLeftDirection.Position));
+                            }
+
+                            if(pawnIsOnStartPosition && endPointfrontPassDirection != null && endPointfrontPassDirection.Figure == null)
+                            {
+                                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointfrontPassDirection.Position));
+                            }
+
+                            break;
+                        case FigureType.Knight:
+                            break;
+                        case FigureType.Bishop:
+                            break;
+                        case FigureType.Rook:
+                            break;
+                        case FigureType.Queen:
+                            break;
+                        case FigureType.King:
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        public bool MakeMove(string path)
+        {
+            List<string> AvailableMoves = getAvailableMoves();
+
+            if(AvailableMoves.Contains(path))
+            {
+                ChessBoardCell startCell = Board.GetCellByAddress(path.Substring(0, 2));
+                ChessBoardCell endCell = Board.GetCellByAddress(path.Substring(2, 2));
+
+                bool reset50 = startCell.Figure.Type == FigureType.Pawn || endCell.Figure != null;
+
+                endCell.SetFigure(startCell.Figure);
+                startCell.SetFigure(null);
+
+                State.updateState(reset50);
+
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    public class ChessGameState
+    {
         public Color TurnOwner { get; private set; }
         public bool WhiteKingCastlingAvailable { get; private set; } = false;
         public bool WhiteQueenCastlingAvailable { get; private set; } = false;
@@ -18,17 +130,9 @@ namespace ChessLogic
         public int RuleOf50 { get; private set; }
         public int Turn { get; private set; }
 
-        public ChessGame(string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+        public ChessGameState(string fen)
         {
-            InitWithFen(fen);
-        }
-
-        private void InitWithFen(string fen)
-        {
-            string[] fenParts = fen.Split(' ');
-
-            Board = new ChessBoard(fenParts[0]);
-
+            string[] fenParts = fen.Split(" ");
             TurnOwner = fenParts[1] == "w" ? Color.White : Color.Black;
 
             foreach (char c in fenParts[2])
@@ -57,37 +161,16 @@ namespace ChessLogic
             Turn = Int32.Parse(fenParts[5]);
         }
 
-        public Figure getFigureAt(int x, int y)
+        public void updateState(bool reset50)
         {
-            return Board.GetCellByPosition(new Vector2(x, y)).Figure;
-        }
+            TurnOwner = TurnOwner == Color.Black ? Color.White : Color.Black;
+            Turn += 1;
 
-        public bool MakeMove(string path)
-        {
-            if(path.Length != 4)
-            {
-                return false;
-            }
+            RuleOf50 = reset50 ? 0 : RuleOf50 + 1;
 
-            string startPos = path.Substring(0, 2);
-            string endPos = path.Substring(2, 2);
-
-            ChessBoardCell startCell = Board.GetCellByAddress(startPos);
-            ChessBoardCell endCell = Board.GetCellByAddress(endPos);
-
-            if (endCell != null && 
-                startCell != null && 
-                startCell != endCell &&
-                startCell.Figure != null)
-            {
-                endCell.PlaceFigure(startCell.Figure);
-                startCell.PlaceFigure(null);
-                return true;
-            }
-
-            return false;
         }
     }
+
     public class Figure
     {
         public Color Color { get; private set; }
@@ -105,6 +188,8 @@ namespace ChessLogic
 
         internal ChessBoard(string fen)
         {
+            fen = fen.Split(' ')[0];
+
             Cells = new Dictionary<Vector2, ChessBoardCell>();
             for (int i = 0; i < 8; i++)
             {
@@ -135,7 +220,7 @@ namespace ChessLogic
                     {
                         FigureType type = (FigureType)Char.ToLower(symbol);
                         ChessBoardCell cell = GetCellByPosition(new Vector2(x, y));
-                        cell.PlaceFigure(new Figure(type, color));
+                        cell.SetFigure(new Figure(type, color));
                     }
                 }
             }
@@ -163,7 +248,6 @@ namespace ChessLogic
     internal class ChessBoardCell
     {
         internal Vector2 Position { get; private set; }
-        internal Color Color { get; private set; }
         internal string Address { get; private set; }
         internal Figure Figure { get; private set; }
 
@@ -173,7 +257,7 @@ namespace ChessLogic
             Address = ChessUtils.GetAddresFromPosition(position);
         }
 
-        internal void PlaceFigure(Figure figure)
+        internal void SetFigure(Figure figure)
         {
             Figure = figure;
         }
@@ -216,7 +300,7 @@ namespace ChessLogic
                 int y = -1;
                 Int32.TryParse(address[1].ToString(), out y);
 
-                if (x >= 'a' && x <= 'h' && y >= 0 && y <= 7)
+                if (x >= 'a' && x <= 'h' && y >= 1 && y <= 8)
                 {
                     Dictionary<char, int> conformity = new Dictionary<char, int>();
                     conformity.Add('a', 0);

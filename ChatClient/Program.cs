@@ -50,30 +50,35 @@ namespace ChatClient
                         string message = input.Substring(6, input.Length - 6);
                         sendMessage(message);
                     }
+                    else if (command == "!rest")
+                    {
+                        game = new ChessGame();
+                        drawGameInfo(game);
+                        drawGameBoard(game);
+                    }
                 }
             }
         }
-
         static private void drawGameInfo(ChessGame game)
         {
-            Console.WriteLine("////////////////////////////////////////\n" +
-                "New game loaded.\n" +
-                $"Turn #{game.Turn}. Turn owner: {game.TurnOwner}. Rule of 50: {game.RuleOf50}\n" +
+            Console.WriteLine(
+                $"/////////////////////////////////////////////\n" +
+                $"Turn #{game.State.Turn}. Turn owner: {game.State.TurnOwner}. Rule of 50: {game.State.RuleOf50}\n" +
                 $"CastlingAvailable:\n" +
-                $"White King: {game.WhiteKingCastlingAvailable}\n" +
-                $"White Queen: {game.WhiteQueenCastlingAvailable}\n" +
-                $"Black King: {game.BlackKingCastlingAvailable}\n" +
-                $"Black Queen: {game.BlackQueenCastlingAvailable}");
-            Console.WriteLine("////////////////////////////////////////");
+                $"  White King: {game.State.WhiteKingCastlingAvailable}\n" +
+                $"  White Queen: {game.State.WhiteQueenCastlingAvailable}\n" +
+                $"  Black King: {game.State.BlackKingCastlingAvailable}\n" +
+                $"  Black Queen: {game.State.BlackQueenCastlingAvailable}\n" +
+                $"/////////////////////////////////////////////");
         }
 
         static private void drawGameBoard(ChessGame game)
         {
-            Console.WriteLine("*---------------*");
+            Console.WriteLine("  +---------------+");
 
             for (int y = 7; y >= 0; y--)
             {
-                Console.Write("|");
+                Console.Write($" {y + 1}|");
                 for (int x = 0; x < 8; x++)
                 {
                     Figure figure = game.getFigureAt(x, y);
@@ -92,7 +97,8 @@ namespace ChatClient
                 Console.Write("\n");
             }
 
-            Console.WriteLine("*---------------*");
+            Console.WriteLine("  +---------------+");
+            Console.WriteLine("   a b c d e f g h");
         }
 
         static private void ConnectToChatHub()
