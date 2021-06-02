@@ -9,8 +9,11 @@ namespace ChessLogic
         private readonly ChessBoard Board;
         public ChessGameState State;
 
-        public ChessGame(string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+        public ChessGame(string fen)
         {
+            string defaultFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+            fen = fen == "" ? defaultFen : fen;
+
             Board = new ChessBoard(fen);
             State = new ChessGameState(fen);
         }
