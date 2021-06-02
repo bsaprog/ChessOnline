@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Numerics;
-using System.Linq;
 
 namespace ChessLogic
 {
@@ -42,50 +41,23 @@ namespace ChessLogic
                     switch (figure.Type)
                     {
                         case FigureType.Pawn:
-
-                            int direction = figure.Color == Color.White ? 1 : -1;
-                            bool pawnIsOnStartPosition = figure.Color == Color.White ? position.Y == 1 : position.Y == 6;
-
-                            Vector2 frontDirection = new Vector2(0, direction);
-                            Vector2 frontPassDirection = new Vector2(0, direction * 2);
-                            Vector2 frontRightDirection = new Vector2(1, direction);
-                            Vector2 fronLeftDirection = new Vector2(-1, direction);
-
-                            ChessBoardCell endPointfrontDirection = Board.GetCellByPosition(position + frontDirection);
-                            ChessBoardCell endPointfrontPassDirection = Board.GetCellByPosition(position + frontPassDirection);
-                            ChessBoardCell endPointfrontRightDirection = Board.GetCellByPosition(position + frontRightDirection);
-                            ChessBoardCell endPointfronLeftDirection = Board.GetCellByPosition(position + fronLeftDirection);
-
-                            if (endPointfrontDirection != null && endPointfrontDirection.Figure == null)
-                            {
-                                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointfrontDirection.Position));
-                            }
-
-                            if (endPointfrontRightDirection != null && endPointfrontRightDirection.Figure != null && endPointfrontRightDirection.Figure.Color != figure.Color)
-                            {
-                                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointfrontRightDirection.Position));
-                            }
-
-                            if (endPointfronLeftDirection != null && endPointfronLeftDirection.Figure != null && endPointfronLeftDirection.Figure.Color != figure.Color)
-                            {
-                                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointfronLeftDirection.Position));
-                            }
-
-                            if(pawnIsOnStartPosition && endPointfrontPassDirection != null && endPointfrontPassDirection.Figure == null)
-                            {
-                                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointfrontPassDirection.Position));
-                            }
-
+                            result.AddRange(getAvailablePawnMoves(figure, position));
                             break;
                         case FigureType.Knight:
+                            result.AddRange(getAvailableKnightMoves(figure, position));
                             break;
                         case FigureType.Bishop:
+                            result.AddRange(getAvailableBishopMoves(figure, position));
                             break;
                         case FigureType.Rook:
+                            result.AddRange(getAvailableRockMoves(figure, position));
                             break;
                         case FigureType.Queen:
+                            result.AddRange(getAvailableBishopMoves(figure, position));
+                            result.AddRange(getAvailableRockMoves(figure, position));
                             break;
                         case FigureType.King:
+                            result.AddRange(getAvailableKingMoves(figure, position));
                             break;
                         default:
                             break;
@@ -96,6 +68,192 @@ namespace ChessLogic
             return result;
         }
 
+        private List<string> getAvailablePawnMoves(Figure figure, Vector2 position)
+        {
+            //TODO: add enemy pawn on pass check.
+
+            List<string> result = new List<string>();
+
+            int direction = figure.Color == Color.White ? 1 : -1;
+            bool pawnIsOnStartPosition = figure.Color == Color.White ? position.Y == 1 : position.Y == 6;
+
+            Vector2 frontDirection = new Vector2(0, direction);
+            Vector2 frontPassDirection = new Vector2(0, 2 * direction);
+            Vector2 frontRightDirection = new Vector2(1, direction);
+            Vector2 fronLeftDirection = new Vector2(-1, direction);
+
+            ChessBoardCell endPointFrontDirection = Board.GetCellByPosition(position + frontDirection);
+            ChessBoardCell endPointFrontPassDirection = Board.GetCellByPosition(position + frontPassDirection);
+            ChessBoardCell endPointFrontRightDirection = Board.GetCellByPosition(position + frontRightDirection);
+            ChessBoardCell endPointFronLeftDirection = Board.GetCellByPosition(position + fronLeftDirection);
+
+            if (endPointFrontDirection != null && endPointFrontDirection.Figure == null)
+            {
+                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointFrontDirection.Position));
+            }
+
+            if (endPointFrontPassDirection != null && endPointFrontPassDirection.Figure == null && pawnIsOnStartPosition)
+            {
+                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointFrontPassDirection.Position));
+            }
+
+            if (endPointFrontRightDirection != null && endPointFrontRightDirection.Figure != null && endPointFrontRightDirection.Figure.Color != figure.Color)
+            {
+                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointFrontRightDirection.Position));
+            }
+
+            if (endPointFronLeftDirection != null && endPointFronLeftDirection.Figure != null && endPointFronLeftDirection.Figure.Color != figure.Color)
+            {
+                result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPointFronLeftDirection.Position));
+            }
+
+            return result;
+        }
+        
+        private List<string> getAvailableKnightMoves(Figure figure, Vector2 position)
+        {
+            List<string> result = new List<string>();
+            List<Vector2> directions = new List<Vector2>();
+            List<ChessBoardCell> endPoints = new List<ChessBoardCell>();
+
+            directions.Add(new Vector2(1, 2));
+            directions.Add(new Vector2(2, 1));
+            directions.Add(new Vector2(1, -2));
+            directions.Add(new Vector2(2, -1));
+            directions.Add(new Vector2(-1, 2));
+            directions.Add(new Vector2(-2, 1));
+            directions.Add(new Vector2(-1, -2));
+            directions.Add(new Vector2(-2, -1));
+
+            foreach (Vector2 direction in directions)
+            {
+                endPoints.Add(Board.GetCellByPosition(position + direction));
+            }
+
+            foreach (ChessBoardCell endPoint in endPoints)
+            {
+                if (endPoint != null && (endPoint.Figure == null || endPoint.Figure.Color != figure.Color))
+                {
+                    result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPoint.Position));
+                }
+            }
+
+            return result;
+        }
+        
+        private List<string> getAvailableBishopMoves(Figure figure, Vector2 position)
+        {
+            List<string> result = new List<string>();
+            List<Vector2> directions = new List<Vector2>();
+
+            directions.Add(new Vector2(1, 1));
+            directions.Add(new Vector2(1, -1));
+            directions.Add(new Vector2(-1, 1));
+            directions.Add(new Vector2(-1, -1));
+
+            foreach (Vector2 direction in directions) 
+            {
+                for (int i = 1; i < 8; i++)
+                {
+                    ChessBoardCell endPoint = Board.GetCellByPosition(position + direction * i);
+                    if(endPoint == null)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        if(endPoint.Figure == null)
+                        {
+                            result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPoint.Position));
+                        }
+                        else if(endPoint.Figure.Color != figure.Color)
+                        {
+                            result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPoint.Position));
+                            break;
+                        }
+                        else if(endPoint.Figure.Color == figure.Color)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+       
+        private List<string> getAvailableRockMoves(Figure figure, Vector2 position)
+        {
+            List<string> result = new List<string>();
+            List<Vector2> directions = new List<Vector2>();
+
+            directions.Add(new Vector2(1, 0));
+            directions.Add(new Vector2(0, 1));
+            directions.Add(new Vector2(-1, 0));
+            directions.Add(new Vector2(0, -1));
+
+            foreach (Vector2 direction in directions)
+            {
+                for (int i = 1; i < 8; i++)
+                {
+                    ChessBoardCell endPoint = Board.GetCellByPosition(position + direction * i);
+                    if (endPoint == null)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        if (endPoint.Figure == null)
+                        {
+                            result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPoint.Position));
+                        }
+                        else if (endPoint.Figure.Color != figure.Color)
+                        {
+                            result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPoint.Position));
+                            break;
+                        }
+                        else if (endPoint.Figure.Color == figure.Color)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+        
+        private List<string> getAvailableKingMoves(Figure figure, Vector2 position)
+        {
+            List<string> result = new List<string>();
+            List<Vector2> directions = new List<Vector2>();
+            List<ChessBoardCell> endPoints = new List<ChessBoardCell>();
+
+            directions.Add(new Vector2(0, 1));
+            directions.Add(new Vector2(1, 1));
+            directions.Add(new Vector2(1, 0));
+            directions.Add(new Vector2(1, -1));
+            directions.Add(new Vector2(-1, 0));
+            directions.Add(new Vector2(-1, -1));
+            directions.Add(new Vector2(-1, 0));
+            directions.Add(new Vector2(1, -1));
+
+            foreach (Vector2 direction in directions)
+            {
+                endPoints.Add(Board.GetCellByPosition(position + direction));
+            }
+
+            foreach (ChessBoardCell endPoint in endPoints)
+            {
+                if (endPoint != null && (endPoint.Figure == null || endPoint.Figure.Color != figure.Color))
+                {
+                    result.Add(ChessUtils.GetAddresFromPosition(position) + ChessUtils.GetAddresFromPosition(endPoint.Position));
+                }
+            }
+
+            return result;
+        }
+        
         public bool MakeMove(string path)
         {
             List<string> AvailableMoves = getAvailableMoves();
@@ -163,11 +321,9 @@ namespace ChessLogic
 
         public void updateState(bool reset50)
         {
-            TurnOwner = TurnOwner == Color.Black ? Color.White : Color.Black;
-            Turn += 1;
-
             RuleOf50 = reset50 ? 0 : RuleOf50 + 1;
-
+            Turn += TurnOwner == Color.Black ? 1 : 0;
+            TurnOwner = TurnOwner == Color.Black ? Color.White : Color.Black;
         }
     }
 
@@ -189,6 +345,7 @@ namespace ChessLogic
         internal ChessBoard(string fen)
         {
             fen = fen.Split(' ')[0];
+            string[] lines = fen.Split('/');
 
             Cells = new Dictionary<Vector2, ChessBoardCell>();
             for (int i = 0; i < 8; i++)
@@ -199,8 +356,6 @@ namespace ChessLogic
                     Cells.Add(cell.Position, cell);
                 }
             }
-
-            string[] lines = fen.Split('/');
 
             for (int y = 0; y < lines.Length; y++)
             {
@@ -314,6 +469,25 @@ namespace ChessLogic
 
                     result = new Vector2(conformity[x], y - 1);
                 }
+            }
+
+            return result;
+        }
+
+        internal static Color InvertColor(Color color)
+        {
+            Color result;
+            if(color == Color.Black)
+            {
+                result = Color.White;
+            }
+            else if(color == Color.White)
+            {
+                result = Color.Black;
+            }
+            else
+            {
+                result = color;
             }
 
             return result;
