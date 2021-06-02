@@ -99,7 +99,7 @@ namespace ChatClient
                 Console.Write($" {y + 1}|");
                 for (int x = 0; x < 8; x++)
                 {
-                    Figure figure = game.getFigureAt(x, y);
+                    Figure figure = game.GetFigureAt(x, y);
                     if (figure == null)
                     {
                         Console.Write(" ");

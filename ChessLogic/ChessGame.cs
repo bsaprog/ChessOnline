@@ -18,14 +18,14 @@ namespace ChessLogic
             State = new ChessGameState(fen);
         }
 
-        public Figure getFigureAt(int x, int y)
+        public Figure GetFigureAt(int x, int y)
         {
             Vector2 position = new Vector2(x, y);
             ChessBoardCell cell = Board.GetCellByPosition(position);
             return cell.Figure;
         }
 
-        public List<string> getAvailableMoves()
+        public List<string> GetAvailableMoves()
         {
             List<string> result = new List<string>();
 
@@ -44,23 +44,23 @@ namespace ChessLogic
                     switch (figure.Type)
                     {
                         case FigureType.Pawn:
-                            result.AddRange(getAvailablePawnMoves(figure, position));
+                            result.AddRange(GetAvailablePawnMoves(figure, position));
                             break;
                         case FigureType.Knight:
-                            result.AddRange(getAvailableKnightMoves(figure, position));
+                            result.AddRange(GetAvailableKnightMoves(figure, position));
                             break;
                         case FigureType.Bishop:
-                            result.AddRange(getAvailableBishopMoves(figure, position));
+                            result.AddRange(GetAvailableBishopMoves(figure, position));
                             break;
                         case FigureType.Rook:
-                            result.AddRange(getAvailableRockMoves(figure, position));
+                            result.AddRange(GetAvailableRockMoves(figure, position));
                             break;
                         case FigureType.Queen:
-                            result.AddRange(getAvailableBishopMoves(figure, position));
-                            result.AddRange(getAvailableRockMoves(figure, position));
+                            result.AddRange(GetAvailableBishopMoves(figure, position));
+                            result.AddRange(GetAvailableRockMoves(figure, position));
                             break;
                         case FigureType.King:
-                            result.AddRange(getAvailableKingMoves(figure, position));
+                            result.AddRange(GetAvailableKingMoves(figure, position));
                             break;
                         default:
                             break;
@@ -71,7 +71,7 @@ namespace ChessLogic
             return result;
         }
 
-        private List<string> getAvailablePawnMoves(Figure figure, Vector2 position)
+        private List<string> GetAvailablePawnMoves(Figure figure, Vector2 position)
         {
             //TODO: add enemy pawn on pass check.
 
@@ -113,7 +113,7 @@ namespace ChessLogic
             return result;
         }
         
-        private List<string> getAvailableKnightMoves(Figure figure, Vector2 position)
+        private List<string> GetAvailableKnightMoves(Figure figure, Vector2 position)
         {
             List<string> result = new List<string>();
             List<Vector2> directions = new List<Vector2>();
@@ -144,7 +144,7 @@ namespace ChessLogic
             return result;
         }
         
-        private List<string> getAvailableBishopMoves(Figure figure, Vector2 position)
+        private List<string> GetAvailableBishopMoves(Figure figure, Vector2 position)
         {
             List<string> result = new List<string>();
             List<Vector2> directions = new List<Vector2>();
@@ -185,7 +185,7 @@ namespace ChessLogic
             return result;
         }
        
-        private List<string> getAvailableRockMoves(Figure figure, Vector2 position)
+        private List<string> GetAvailableRockMoves(Figure figure, Vector2 position)
         {
             List<string> result = new List<string>();
             List<Vector2> directions = new List<Vector2>();
@@ -226,7 +226,7 @@ namespace ChessLogic
             return result;
         }
         
-        private List<string> getAvailableKingMoves(Figure figure, Vector2 position)
+        private List<string> GetAvailableKingMoves(Figure figure, Vector2 position)
         {
             List<string> result = new List<string>();
             List<Vector2> directions = new List<Vector2>();
@@ -259,7 +259,7 @@ namespace ChessLogic
         
         public bool MakeMove(string path)
         {
-            List<string> AvailableMoves = getAvailableMoves();
+            List<string> AvailableMoves = GetAvailableMoves();
 
             if(AvailableMoves.Contains(path))
             {
@@ -271,7 +271,7 @@ namespace ChessLogic
                 endCell.SetFigure(startCell.Figure);
                 startCell.SetFigure(null);
 
-                State.updateState(reset50);
+                State.UpdateState(reset50);
 
                 return true;
             }
@@ -322,7 +322,7 @@ namespace ChessLogic
             Turn = Int32.Parse(fenParts[5]);
         }
 
-        public void updateState(bool reset50)
+        public void UpdateState(bool reset50)
         {
             RuleOf50 = reset50 ? 0 : RuleOf50 + 1;
             Turn += TurnOwner == Color.Black ? 1 : 0;
