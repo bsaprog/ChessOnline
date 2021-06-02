@@ -27,8 +27,7 @@ namespace ChessLogic
         {
             string[] fenParts = fen.Split(' ');
 
-            Board = new ChessBoard();
-            Board.InitWithFen(fenParts[0]);
+            Board = new ChessBoard(fenParts[0]);
 
             TurnOwner = fenParts[1] == "w" ? Color.White : Color.Black;
 
@@ -62,13 +61,49 @@ namespace ChessLogic
         {
             return Board.GetCellByPosition(new Vector2(x, y)).Figure;
         }
+
+        public bool MakeMove(string path)
+        {
+            if(path.Length != 4)
+            {
+                return false;
+            }
+
+            string startPos = path.Substring(0, 2);
+            string endPos = path.Substring(2, 2);
+
+            ChessBoardCell startCell = Board.GetCellByAddress(startPos);
+            ChessBoardCell endCell = Board.GetCellByAddress(endPos);
+
+            if (endCell != null && 
+                startCell != null && 
+                startCell != endCell &&
+                startCell.Figure != null)
+            {
+                endCell.PlaceFigure(startCell.Figure);
+                startCell.PlaceFigure(null);
+                return true;
+            }
+
+            return false;
+        }
+    }
+    public class Figure
+    {
+        public Color Color { get; private set; }
+        public FigureType Type { get; private set; }
+        public Figure(FigureType type, Color color)
+        {
+            Type = type;
+            Color = color;
+        }
     }
 
-    public class ChessBoard
+    internal class ChessBoard
     {
-        private readonly Dictionary<Vector2, ChessBoardCell> Cells = new Dictionary<Vector2, ChessBoardCell>();
+        internal readonly Dictionary<Vector2, ChessBoardCell> Cells = new Dictionary<Vector2, ChessBoardCell>();
 
-        public ChessBoard()
+        internal ChessBoard(string fen)
         {
             Cells = new Dictionary<Vector2, ChessBoardCell>();
             for (int i = 0; i < 8; i++)
@@ -79,20 +114,7 @@ namespace ChessLogic
                     Cells.Add(cell.Position, cell);
                 }
             }
-        }
 
-        public ChessBoardCell GetCellByAddress(string address)
-        {
-            return Cells[ChessUtils.GetPositionFromAddress(address)];
-        }
-
-        public ChessBoardCell GetCellByPosition(Vector2 position)
-        {
-            return Cells[position];
-        }
-
-        public void InitWithFen(string fen)
-        {
             string[] lines = fen.Split('/');
 
             for (int y = 0; y < lines.Length; y++)
@@ -118,30 +140,99 @@ namespace ChessLogic
                 }
             }
         }
+
+        internal ChessBoardCell GetCellByPosition(Vector2 position)
+        {
+            ChessBoardCell result = null;
+
+            if(Cells.ContainsKey(position))
+            {
+                result = Cells[position];
+            }
+
+            return result;
+        }
+
+        internal ChessBoardCell GetCellByAddress(string address)
+        {
+            Vector2 position = ChessUtils.GetPositionFromAddress(address);
+            return GetCellByPosition(position);
+        }
     }
    
-    public class ChessBoardCell
+    internal class ChessBoardCell
     {
-        public Vector2 Position { get; private set; }
-        public Color Color { get; private set; }
-        public string Address { get; private set; }
-        public Figure Figure { get; private set; }
+        internal Vector2 Position { get; private set; }
+        internal Color Color { get; private set; }
+        internal string Address { get; private set; }
+        internal Figure Figure { get; private set; }
 
-        public ChessBoardCell(Vector2 position)
+        internal ChessBoardCell(Vector2 position)
         {
             Position = position;
             Address = ChessUtils.GetAddresFromPosition(position);
         }
 
-        public ChessBoardCell(string address)
-        {
-            Address = address;
-            Position = ChessUtils.GetPositionFromAddress(address);
-        }
-
-        public void PlaceFigure(Figure figure)
+        internal void PlaceFigure(Figure figure)
         {
             Figure = figure;
+        }
+    }
+
+    internal static class ChessUtils
+    {
+        internal static string GetAddresFromPosition(Vector2 position)
+        {
+            string result = "";
+
+            int x = (Int32)position.X;
+            int y = (Int32)position.Y;
+
+            if(x >= 0 && x <= 7 && y >= 0 && y <= 7)
+            {
+                string[] conformity = new string[8];
+                conformity[0] = "a";
+                conformity[1] = "b";
+                conformity[2] = "c";
+                conformity[3] = "d";
+                conformity[4] = "e";
+                conformity[5] = "f";
+                conformity[6] = "g";
+                conformity[7] = "h";
+
+                result = conformity[x] + (y + 1).ToString();
+            }
+
+            return result;
+        }
+
+        internal static Vector2 GetPositionFromAddress(string address)
+        {
+            Vector2 result = new Vector2(-1, -1);
+            
+            if(address.Length == 2)
+            {
+                char x = address[0];
+                int y = -1;
+                Int32.TryParse(address[1].ToString(), out y);
+
+                if (x >= 'a' && x <= 'h' && y >= 0 && y <= 7)
+                {
+                    Dictionary<char, int> conformity = new Dictionary<char, int>();
+                    conformity.Add('a', 0);
+                    conformity.Add('b', 1);
+                    conformity.Add('c', 2);
+                    conformity.Add('d', 3);
+                    conformity.Add('e', 4);
+                    conformity.Add('f', 5);
+                    conformity.Add('g', 6);
+                    conformity.Add('h', 7);
+
+                    result = new Vector2(conformity[x], y - 1);
+                }
+            }
+
+            return result;
         }
     }
 
@@ -167,55 +258,5 @@ namespace ChessLogic
     {
         None = 0,
         Classic
-    }
-
-    public class Figure
-    {
-        public Color Color { get; private set; }
-        public FigureType Type { get; private set; }
-        public Figure(FigureType type, Color color)
-        {
-            Type = type;
-            Color = color;
-        }
-    }
-
-    public static class ChessUtils
-    {
-        public static string GetAddresFromPosition(Vector2 position)
-        {
-            int x = (Int32)position.X;
-            int y = (Int32)position.Y;
-
-            string[] conformity = new string[8];
-            conformity[0] = "a";
-            conformity[1] = "b";
-            conformity[2] = "c";
-            conformity[3] = "d";
-            conformity[4] = "e";
-            conformity[5] = "f";
-            conformity[6] = "g";
-            conformity[7] = "h";
-
-            return conformity[x] + (y + 1).ToString();
-        }
-
-        public static Vector2 GetPositionFromAddress(string address)
-        {
-            char x = address[0];
-            char y = address[1];
-
-            Dictionary<char, int> conformity = new Dictionary<char, int>();
-            conformity.Add('a', 0);
-            conformity.Add('b', 1);
-            conformity.Add('c', 2);
-            conformity.Add('d', 3);
-            conformity.Add('e', 4);
-            conformity.Add('f', 5);
-            conformity.Add('g', 6);
-            conformity.Add('h', 7);
-
-            return new Vector2(conformity[x], y - 1);
-        }
     }
 }

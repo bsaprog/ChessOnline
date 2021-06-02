@@ -13,26 +13,65 @@ namespace ChatClient
         {
             ConnectToChatHub();
             ChessGame game = new ChessGame();
-            drawGame(game);
+            drawGameInfo(game);
+            drawGameBoard(game);
 
-            sendMessage("i am loaded");
-            Console.ReadKey();
+            while (true)
+            {
+                string input = Console.ReadLine();
+                if(input.Length < 5)
+                {
+                    continue;
+                }
+                else
+                {
+                    string command = input.Substring(0, 5);
+                    if (command == "!exit")
+                    {
+                        break;
+                    }
+                    else if (command == "!move")
+                    {
+                        string move = input.Substring(6, input.Length - 6);
+                        if (game.MakeMove(move))
+                        {
+                            sendMessage($"player make move: {move}");
+                            drawGameInfo(game);
+                            drawGameBoard(game);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Cant make this move.");
+                        }
+
+                    }
+                    else if (command == "!send")
+                    {
+                        string message = input.Substring(6, input.Length - 6);
+                        sendMessage(message);
+                    }
+                }
+            }
         }
 
-        static private void drawGame(ChessGame game)
+        static private void drawGameInfo(ChessGame game)
         {
-            Console.WriteLine("////////////////////////////////////////");
-            Console.WriteLine("New game loaded.");
-            Console.WriteLine($"Turn #{game.Turn}. Turn owner: {game.TurnOwner}. Rule of 50: {game.RuleOf50}");
-            Console.WriteLine($"CastlingAvailable:\n" +
+            Console.WriteLine("////////////////////////////////////////\n" +
+                "New game loaded.\n" +
+                $"Turn #{game.Turn}. Turn owner: {game.TurnOwner}. Rule of 50: {game.RuleOf50}\n" +
+                $"CastlingAvailable:\n" +
                 $"White King: {game.WhiteKingCastlingAvailable}\n" +
                 $"White Queen: {game.WhiteQueenCastlingAvailable}\n" +
                 $"Black King: {game.BlackKingCastlingAvailable}\n" +
                 $"Black Queen: {game.BlackQueenCastlingAvailable}");
+            Console.WriteLine("////////////////////////////////////////");
+        }
 
-            Console.WriteLine("----------");
+        static private void drawGameBoard(ChessGame game)
+        {
+            Console.WriteLine("*---------------*");
 
-            for (int y = 7; y >= 0; y--)  
+            for (int y = 7; y >= 0; y--)
             {
                 Console.Write("|");
                 for (int x = 0; x < 8; x++)
@@ -40,7 +79,7 @@ namespace ChatClient
                     Figure figure = game.getFigureAt(x, y);
                     if (figure == null)
                     {
-                        Console.Write("*");
+                        Console.Write(" ");
                     }
                     else
                     {
@@ -48,13 +87,12 @@ namespace ChatClient
                         Console.Write((Char)figure.Type);
                         Console.ResetColor();
                     }
+                    Console.Write("|");
                 }
-                Console.Write("|\n");
+                Console.Write("\n");
             }
 
-            Console.WriteLine("----------");
-
-            Console.WriteLine("////////////////////////////////////////");
+            Console.WriteLine("*---------------*");
         }
 
         static private void ConnectToChatHub()
