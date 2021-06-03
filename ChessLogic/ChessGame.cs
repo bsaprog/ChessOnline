@@ -150,13 +150,8 @@ namespace ChessLogic
                 Figure figure = pair.Value.Figure;
                 Vector2 position = pair.Key;
 
-                if (figure != null)
+                if (figure != null && figure.Color == _state.TurnOwner)
                 {
-                    if(figure.Color != _state.TurnOwner)
-                    {
-                        continue;
-                    }
-
                     result.AddRange(GetAvailableFigureMoves(figure, position));
                 }
             }
