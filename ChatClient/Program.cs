@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Numerics;
 using System.Threading.Tasks;
 using ChessLogic;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -42,7 +43,6 @@ namespace ChatClient
                 {
                     if (game.MakeMove(commandArgs))
                     {
-                        SendMessage($"player make move: {commandArgs}");
                         DrawGameInfo();
                         DrawGameBoard();
                     }
@@ -59,18 +59,11 @@ namespace ChatClient
                 {
                     StartNewGame();
                 }
+                else if (command == "load")
+                {
+                    LoadGame(commandArgs);
+                }
             }
-        }
-
-        static private void DrawGameInfo()
-        {
-            Console.WriteLine(
-                $"Turn #{game.State.Turn}. Turn owner: {game.State.TurnOwner}. Rule of 50: {game.State.RuleOf50}\n" +
-                $"CastlingAvailable:\n" +
-                $"  White King: {game.State.WhiteKingCastlingAvailable}\n" +
-                $"  White Queen: {game.State.WhiteQueenCastlingAvailable}\n" +
-                $"  Black King: {game.State.BlackKingCastlingAvailable}\n" +
-                $"  Black Queen: {game.State.BlackQueenCastlingAvailable}\n");
         }
 
         static private void ConnectToChatHub()
@@ -83,11 +76,23 @@ namespace ChatClient
             ChatHubConnection.StartAsync();
         }
 
-        static private void StartNewGame(string fen = "")
+        static private void StartNewGame()
+        {
+            game = new ChessGame();
+            DrawGameInfo();
+            DrawGameBoard();
+        }
+
+        static private void LoadGame(string fen = "")
         {
             game = new ChessGame(fen);
             DrawGameInfo();
             DrawGameBoard();
+        }
+
+        static private void DrawGameInfo()
+        {
+            Console.WriteLine(game.GetStateString());
         }
 
         static private void DrawGameBoard()
@@ -99,7 +104,7 @@ namespace ChatClient
                 Console.Write($" {y + 1}|");
                 for (int x = 0; x < 8; x++)
                 {
-                    Figure figure = game.GetFigureAt(x, y);
+                    Figure figure = game.GetFigureAt(new Vector2(x, y));
                     if (figure == null)
                     {
                         Console.Write(" ");
