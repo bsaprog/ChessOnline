@@ -1,9 +1,49 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Linq;
 
 namespace ChessLogic
 {
+    internal struct MoveVariant
+    {
+        internal List<ChessBoardCell> Blockers { get; private set; }
+        internal bool IsAvailable
+        {
+            get
+            {
+                if (Start.Figure.Type == FigureType.Pawn && Start.Position.X != End.Position.X)
+                {
+                    return End.Figure != null && End.Figure.Color != Start.Figure.Color;
+                }
+                else
+                {
+                    return Blockers.Count == 0;
+                }
+            }
+        }
+        internal ChessBoardCell Start { get; private set; }
+        internal ChessBoardCell End { get; private set; }
+
+        internal MoveVariant(ChessBoardCell start, ChessBoardCell end)
+        {
+            Start = start;
+            End = end;
+            Blockers = new List<ChessBoardCell>();
+        }
+        internal void AddBlocker(ChessBoardCell cell)
+        {
+            Blockers.Add(cell);
+        }
+        internal void AddBlockersList(List<ChessBoardCell> blockers)
+        {
+            this.Blockers.AddRange(blockers);
+        }
+        public override string ToString()
+        {
+            return $"from {Start.Address} to {End.Address}";
+        }
+    }
 
     internal struct FigureMove
     {
@@ -26,102 +66,388 @@ namespace ChessLogic
         private readonly ChessBoard _board;
         private readonly ChessGameState _state;
         private readonly Stack<FigureMove> _history;
+        private readonly List<MoveVariant> _moveVariants;
 
         internal FigureMoveManager(ChessBoard board, ChessGameState state)
         {
             _board = board;
             _state = state;
             _history = new Stack<FigureMove>();
+            _moveVariants = new List<MoveVariant>();
+            
+            RefreshMoveVariants();
+            RemoveCheckMoveVariants();
         }
-
-        internal void MakeMove(FigureMove move)
+        private void RefreshMoveVariants()
         {
-            if(MoveIsReal(move) )
+            _moveVariants.Clear();
+            List<ChessBoardCell> cells = _board.GetCellsWithFigures();
+            foreach(ChessBoardCell cell in cells)
             {
-                move.Start.SetFigure(null);
-                move.End.SetFigure(move.MovingFigure);
-
-               // _state.UpdateState(false);
-
-                _history.Push(move);
+                _moveVariants.AddRange(GetMoveVariantsFromCell(cell));
             }
         }
-
-        internal void MakeMove(string path)
+        private void RemoveCheckMoveVariants()
         {
-            ChessBoardCell start = _board.GetCellByAddress(path.Substring(0, 2));
-            ChessBoardCell end = _board.GetCellByAddress(path.Substring(2, 2));
+            ChessBoardCell cellWithKing = _board.GetCellWithKing(_state.TurnOwner);
+            
+            List<MoveVariant> potentialAttacks = GetPotentialCellAttackMoveVariants(cellWithKing)
+                .Where(move => move.Blockers.Count == 1)
+                .ToList<MoveVariant>();
 
-            FigureMove move = new FigureMove(start, end);
-
-            MakeMove(move);
-        }
-
-        internal void UndoLastMove()
-        {
-            if (_history.Count > 0)
+            foreach (MoveVariant attack in potentialAttacks)
             {
-                FigureMove move = _history.Pop();
+                List<Vector2> availableMovePositions = new List<Vector2>();
 
-                move.Start.SetFigure(move.MovingFigure);
-                move.End.SetFigure(move.RemovingFigure);
-            }
-        }
+                Vector2 attackPosition = attack.Start.Position;
+                Vector2 blockPosition = attack.Blockers[0].Position;
+                Vector2 delta = attackPosition - blockPosition;
 
-        private bool MoveIsReal(FigureMove move)
-        {
-            List<FigureMove> AvailableMoves = GetAvailableMovesFromCell(move.Start);
-            return AvailableMoves.Contains(move);
-        }
+                int counter = (int)Math.Max(Math.Abs(delta.X), Math.Abs(delta.Y));
 
-        private List<FigureMove> GetAvailableMovesFromCell(ChessBoardCell startCell)
-        {
-            List<FigureMove> result = new List<FigureMove>();
+                Vector2 direction = delta / counter;
 
-            if(startCell != null)
-            {
-                Vector2 startPosition = startCell.Position;
-
-                Figure figure = startCell.Figure;
-                if(figure != null)
+                for (int i = counter; i > 0; i --)
                 {
-                    int direction = figure.Color == Color.White ? 1 : -1;
-                    bool pawnIsOnStartPosition = figure.Color == Color.White ? startPosition.Y == 1 : startPosition.Y == 6;
+                    availableMovePositions.Add(blockPosition + direction * i);
+                }
 
-                    Vector2 frontDirection = new Vector2(0, direction);
-                    Vector2 frontPassDirection = new Vector2(0, 2 * direction);
-                    Vector2 frontRightDirection = new Vector2(1, direction);
-                    Vector2 fronLeftDirection = new Vector2(-1, direction);
+                var o = _moveVariants
+                    .Where(move => move.Start.Position == blockPosition)
+                    .Where(move => move.IsAvailable == true)
+                    .Where(move => !availableMovePositions.Contains(move.End.Position));
 
-                    ChessBoardCell endCellFrontDirection = _board.GetCellByPosition(startPosition + frontDirection);
-                    ChessBoardCell endCellFrontPassDirection = _board.GetCellByPosition(startPosition + frontPassDirection);
-                    ChessBoardCell endCellFrontRightDirection = _board.GetCellByPosition(startPosition + frontRightDirection);
-                    ChessBoardCell endCellFronLeftDirection = _board.GetCellByPosition(startPosition + fronLeftDirection);
+                var a = 0;
 
-                    if (endCellFrontDirection != null && endCellFrontDirection.Figure == null)
+            }
+        }
+        private bool KingIsUnderAttack(Color kingColor)
+        {
+            ChessBoardCell cellWithKing = _board.GetCellWithKing(kingColor);
+
+            List<ChessBoardCell> potentialAttackers = GetPotentialCellAttackers(cellWithKing);
+            List<MoveVariant> moveVariants = GetMoveVariantsFromCells(potentialAttackers);
+
+            return moveVariants
+                .Where(move => move.IsAvailable && move.End == cellWithKing)
+                .Count() != 0;
+        }
+        private List<ChessBoardCell> GetPotentialCellAttackers(ChessBoardCell cell)
+        {
+            return GetPotentialCellAttackMoveVariants(cell)
+                .Select(cell => cell.Start)
+                .ToList<ChessBoardCell>();
+        }
+        private List<MoveVariant> GetPotentialCellAttackMoveVariants(ChessBoardCell cell)
+        {
+            return _moveVariants
+                .Select(move => move)
+                .Where(move => move.End == cell && move.Start.Figure.Color != cell.Figure.Color)
+                .ToList<MoveVariant>();
+        }
+
+        private List<MoveVariant> GetMoveVariantsFromCell(ChessBoardCell startCell)
+        {
+            List<MoveVariant> result = new List<MoveVariant>();
+
+            if (startCell != null && startCell.Figure != null)
+            {
+                switch (startCell.Figure.Type)
+                {
+                    case FigureType.Pawn:
+                        result.AddRange(GetPawnMoveVariantsFromCell(startCell));
+                        break;
+                    case FigureType.Knight:
+                        result.AddRange(GetKnightMoveVariantsFromCell(startCell));
+                        break;
+                    case FigureType.Bishop:
+                        result.AddRange(GetBishopMoveVariantsFromCell(startCell));
+                        break;
+                    case FigureType.Rook:
+                        result.AddRange(GetRockMoveVariantsFromCell(startCell));
+                        break;
+                    case FigureType.Queen:
+                        result.AddRange(GetBishopMoveVariantsFromCell(startCell));
+                        result.AddRange(GetRockMoveVariantsFromCell(startCell));
+                        break;
+                    case FigureType.King:
+                        result.AddRange(GetKingMoveVariantsFromCell(startCell));
+                        break;
+                    default:
+                        break;
+                }
+            }
+            return result;
+        }
+        private List<MoveVariant> GetMoveVariantsFromCells(List<ChessBoardCell> cells)
+        {
+            List<MoveVariant> result = new List<MoveVariant>();
+
+            foreach (ChessBoardCell cell in cells)
+            {
+                result.AddRange(GetMoveVariantsFromCell(cell));
+            }
+
+            return result;
+        }
+        private List<MoveVariant> GetPawnMoveVariantsFromCell(ChessBoardCell startCell)
+        {
+            List<MoveVariant> result = new List<MoveVariant>();
+
+            Vector2 startPosition = startCell.Position;
+
+            int direction = startCell.Figure.Color == Color.White ? 1 : -1;
+            bool pawnIsOnStartPosition = startCell.Figure.Color == Color.White ? startPosition.Y == 1 : startPosition.Y == 6;
+
+            ChessBoardCell endCellFrontDirection = _board.GetCellByPosition(startPosition + new Vector2(0, direction));
+            ChessBoardCell endCellFrontPassDirection = _board.GetCellByPosition(startPosition + new Vector2(0, 2 * direction));
+            ChessBoardCell endCellFrontRightDirection = _board.GetCellByPosition(startPosition + new Vector2(1, direction));
+            ChessBoardCell endCellFronLeftDirection = _board.GetCellByPosition(startPosition + new Vector2(-1, direction));
+
+            if (endCellFrontDirection != null)
+            {
+                MoveVariant moveVariant = new MoveVariant(startCell, endCellFrontDirection);
+                if(endCellFrontDirection.Figure != null)
+                {
+                    moveVariant.AddBlocker(endCellFrontDirection);
+                }
+
+                result.Add(moveVariant);
+            }
+
+            if (endCellFrontPassDirection != null && pawnIsOnStartPosition)
+            {
+                MoveVariant moveVariant = new MoveVariant(startCell, endCellFrontDirection);
+                if(endCellFrontDirection != null && endCellFrontDirection.Figure != null)
+                {
+                    moveVariant.AddBlocker(endCellFrontDirection);
+                }
+
+                if(endCellFrontPassDirection.Figure != null)
+                {
+                    moveVariant.AddBlocker(endCellFrontPassDirection);
+                }
+
+                result.Add(moveVariant);
+            }
+
+            if (endCellFrontRightDirection != null)
+            {
+                result.Add(new MoveVariant(startCell, endCellFrontRightDirection));
+            }
+
+            if (endCellFronLeftDirection != null)
+            {
+                result.Add(new MoveVariant(startCell, endCellFronLeftDirection));
+            }
+
+            return result;
+        }
+        private List<MoveVariant> GetKnightMoveVariantsFromCell(ChessBoardCell startCell)
+        {
+            List<MoveVariant> result = new List<MoveVariant>();
+
+            List<Vector2> directions = new List<Vector2>();
+            List<ChessBoardCell> endCells = new List<ChessBoardCell>();
+
+            directions.Add(new Vector2(1, 2));
+            directions.Add(new Vector2(2, 1));
+            directions.Add(new Vector2(1, -2));
+            directions.Add(new Vector2(2, -1));
+            directions.Add(new Vector2(-1, 2));
+            directions.Add(new Vector2(-2, 1));
+            directions.Add(new Vector2(-1, -2));
+            directions.Add(new Vector2(-2, -1));
+
+            foreach (Vector2 direction in directions)
+            {
+                endCells.Add(_board.GetCellByPosition(startCell.Position + direction));
+            }
+
+            foreach (ChessBoardCell endCell in endCells)
+            {
+                if (endCell != null) {
+                    MoveVariant moveVariant = new MoveVariant(startCell, endCell);
+                    if (endCell.Figure != null && endCell.Figure.Color == startCell.Figure.Color)
                     {
-                        result.Add(new FigureMove(startCell, endCellFrontDirection));
+                        moveVariant.AddBlocker(endCell);
                     }
 
-                    if (endCellFrontPassDirection != null && endCellFrontPassDirection.Figure == null && pawnIsOnStartPosition)
-                    {
-                        result.Add(new FigureMove(startCell, endCellFrontPassDirection));
-                    }
+                    result.Add(moveVariant);
+                }
+            }
 
-                    if (endCellFrontRightDirection != null && endCellFrontRightDirection.Figure != null && endCellFrontRightDirection.Figure.Color != figure.Color)
-                    {
-                        result.Add(new FigureMove(startCell, endCellFrontRightDirection));
-                    }
+            return result;
+        }
+        private List<MoveVariant> GetBishopMoveVariantsFromCell(ChessBoardCell startCell)
+        {
+            List<MoveVariant> result = new List<MoveVariant>();
 
-                    if (endCellFronLeftDirection != null && endCellFronLeftDirection.Figure != null && endCellFronLeftDirection.Figure.Color != figure.Color)
+            List<Vector2> directions = new List<Vector2>();
+
+            directions.Add(new Vector2(1, 1));
+            directions.Add(new Vector2(1, -1));
+            directions.Add(new Vector2(-1, 1));
+            directions.Add(new Vector2(-1, -1));
+
+            foreach (Vector2 direction in directions)
+            {
+                List<ChessBoardCell> figuresOnThePath = new List<ChessBoardCell>();
+
+                for (int i = 1; i < 8; i++)
+                {
+                    ChessBoardCell endCell = _board.GetCellByPosition(startCell.Position + direction * i);
+                    if (endCell == null)
                     {
-                        result.Add(new FigureMove(startCell, endCellFronLeftDirection));
+                        break;
+                    }
+                    else
+                    {
+                        MoveVariant moveVariant = new MoveVariant(startCell, endCell);
+                        moveVariant.AddBlockersList(figuresOnThePath);
+
+                        if (endCell.Figure != null)
+                        {
+                            if (endCell.Figure.Color == startCell.Figure.Color)
+                            {
+                                moveVariant.AddBlocker(endCell);
+                            }
+
+                            figuresOnThePath.Add(endCell);
+                        }
+
+                        result.Add(moveVariant);
                     }
                 }
             }
 
             return result;
         }
+        private List<MoveVariant> GetRockMoveVariantsFromCell(ChessBoardCell startCell)
+        {
+            List<MoveVariant> result = new List<MoveVariant>();
+
+            List<Vector2> directions = new List<Vector2>();
+
+            directions.Add(new Vector2(1, 0));
+            directions.Add(new Vector2(0, 1));
+            directions.Add(new Vector2(-1, 0));
+            directions.Add(new Vector2(0, -1));
+
+            foreach (Vector2 direction in directions)
+            {
+                List<ChessBoardCell> figuresOnThePath = new List<ChessBoardCell>();
+
+                for (int i = 1; i < 8; i++)
+                {
+                    ChessBoardCell endCell = _board.GetCellByPosition(startCell.Position + direction * i);
+                    if (endCell == null)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        MoveVariant moveVariant = new MoveVariant(startCell, endCell);
+                        moveVariant.AddBlockersList(figuresOnThePath);
+
+                        if (endCell.Figure != null)
+                        {
+                            if (endCell.Figure.Color == startCell.Figure.Color)
+                            {
+                                moveVariant.AddBlocker(endCell);
+                            }
+
+                            figuresOnThePath.Add(endCell);
+                        }
+
+                        result.Add(moveVariant);
+                    }
+                }
+            }
+
+            return result;
+        }
+        private List<MoveVariant> GetKingMoveVariantsFromCell(ChessBoardCell startCell)
+        {
+            List<MoveVariant> result = new List<MoveVariant>();
+
+            List<Vector2> directions = new List<Vector2>();
+            List<ChessBoardCell> endCells = new List<ChessBoardCell>();
+
+            directions.Add(new Vector2(0, 1));
+            directions.Add(new Vector2(1, 1));
+            directions.Add(new Vector2(1, 0));
+            directions.Add(new Vector2(1, -1));
+            directions.Add(new Vector2(-1, 0));
+            directions.Add(new Vector2(-1, -1));
+            directions.Add(new Vector2(-1, 0));
+            directions.Add(new Vector2(1, -1));
+
+            foreach (Vector2 direction in directions)
+            {
+                endCells.Add(_board.GetCellByPosition(startCell.Position + direction));
+            }
+
+            foreach (ChessBoardCell endCell in endCells)
+            {
+                if (endCell != null) 
+                {
+                    MoveVariant moveVariant = new MoveVariant(startCell, endCell);
+
+                    if (endCell.Figure != null && endCell.Figure.Color == startCell.Figure.Color)
+                    {
+                        moveVariant.AddBlocker(endCell);
+                    }
+
+                    result.Add(moveVariant);
+                }
+            }
+
+            return result;
+        }
+
+        /*
+       internal void MakeMove(FigureMove move)
+       {
+           if(MoveIsReal(move) )
+           {
+               move.Start.SetFigure(null);
+               move.End.SetFigure(move.MovingFigure);
+
+              // _state.UpdateState(false);
+
+               _history.Push(move);
+           }
+       }
+
+       internal void MakeMove(string path)
+       {
+           ChessBoardCell start = _board.GetCellByAddress(path.Substring(0, 2));
+           ChessBoardCell end = _board.GetCellByAddress(path.Substring(2, 2));
+
+           FigureMove move = new FigureMove(start, end);
+
+           MakeMove(move);
+       }
+
+       internal void UndoLastMove()
+       {
+           if (_history.Count > 0)
+           {
+               FigureMove move = _history.Pop();
+
+               move.Start.SetFigure(move.MovingFigure);
+               move.End.SetFigure(move.RemovingFigure);
+           }
+       }
+
+       private bool MoveIsReal(FigureMove move)
+       {
+           List<FigureMove> AvailableMoves = GetAvailableMovesFromCell(move.Start);
+           return AvailableMoves.Contains(move);
+       }
+       */
+
     }
 
     public class ChessGame
@@ -510,6 +836,10 @@ namespace ChessLogic
             Type = type;
             Color = color;
         }
+        public override string ToString()
+        {
+            return $"{Color.ToString()} {Type.ToString()}";
+        }
     }
 
     internal class ChessBoard
@@ -569,14 +899,27 @@ namespace ChessLogic
             Vector2 position = ChessUtils.GetPositionFromAddress(address);
             return GetCellByPosition(position);
         }
+        internal ChessBoardCell GetCellWithKing(Color kingColor)
+        {
+            return Cells
+                .Select(pair => pair.Value)
+                .Where(cell => cell.Figure != null && cell.Figure.Type == FigureType.King && cell.Figure.Color == kingColor)
+                .First();
+        }
+        internal List<ChessBoardCell> GetCellsWithFigures()
+        {
+            return Cells
+                .Select(pair => pair.Value)
+                .Where(cell => cell.Figure != null)
+                .ToList<ChessBoardCell>();
+        }
     }
-   
+
     internal class ChessBoardCell
     {
         internal Vector2 Position { get; private set; }
         internal string Address { get; private set; }
         internal Figure Figure { get; private set; }
-
         internal ChessBoardCell(Vector2 position)
         {
             Position = position;
@@ -585,6 +928,10 @@ namespace ChessLogic
         internal void SetFigure(Figure figure)
         {
             Figure = figure;
+        }
+        public override string ToString()
+        {
+            return $"{Address} {Figure.ToString()}";
         }
     }
 
