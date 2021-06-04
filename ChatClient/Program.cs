@@ -63,6 +63,15 @@ namespace ChatClient
                 {
                     LoadGame(commandArgs);
                 }
+                else if(command == "loadtemplate")
+                {
+                    string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+                    if (commandArgs == "1")
+                    {
+                        fen = "kn2r1R1/pb6/8/3Q4/8/8/8/2K5 w - - 0 1";
+                    }
+                    LoadGame(fen);
+                }
             }
         }
 
