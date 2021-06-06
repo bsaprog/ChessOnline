@@ -7,37 +7,13 @@ namespace ChessLogic
 {
     internal struct MoveVariant
     {
-        internal List<ChessBoardCell> Blockers { get; private set; }
-        internal bool IsAvailable
-        {
-            get
-            {
-                if (Start.Figure != null && Start.Figure.Type == FigureType.Pawn && Start.Position.X != End.Position.X)
-                {
-                    return End.Figure != null && End.Figure.Color != Start.Figure.Color;
-                }
-                else
-                {
-                    return Blockers.Count == 0;
-                }
-            }
-        }
         internal ChessBoardCell Start { get; private set; }
         internal ChessBoardCell End { get; private set; }
-
         internal MoveVariant(ChessBoardCell start, ChessBoardCell end)
         {
             Start = start;
             End = end;
-            Blockers = new List<ChessBoardCell>();
-        }
-        internal void AddBlocker(ChessBoardCell cell)
-        {
-            Blockers.Add(cell);
-        }
-        internal void AddBlockersList(List<ChessBoardCell> blockers)
-        {
-            this.Blockers.AddRange(blockers);
+
         }
         public override string ToString()
         {
@@ -67,7 +43,6 @@ namespace ChessLogic
         private readonly ChessGameState _state;
         private readonly Stack<FigureMove> _history;
         private readonly List<MoveVariant> _moveVariants;
-        private readonly List<MoveVariant> _blockedMoveVariants;
 
         internal FigureMoveManager(ChessBoard board, ChessGameState state)
         {
@@ -75,107 +50,47 @@ namespace ChessLogic
             _state = state;
             _history = new Stack<FigureMove>();
             _moveVariants = new List<MoveVariant>();
-            _blockedMoveVariants = new List<MoveVariant>();
-
-            RefreshMoveVariants();
-            RefreshBlockedMoveVariants();
         }
-        private void RefreshMoveVariants()
+        internal void RefreshMoveVariants(int deep = 1)
         {
+            deep -= 1;
             _moveVariants.Clear();
             List<ChessBoardCell> cells = _board.GetCellsWithFigures();
             foreach(ChessBoardCell cell in cells)
             {
                 _moveVariants.AddRange(GetMoveVariantsFromCell(cell));
             }
-        }
-        private void RefreshBlockedMoveVariants()
-        {
-            _blockedMoveVariants.Clear();
-            ChessBoardCell cellWithKing = _board.GetCellWithKing(_state.TurnOwner);
-            
-            List<MoveVariant> potentialAttacks = GetPotentialCellAttackMoveVariants(cellWithKing)
-                .Where(move => move.Blockers.Count == 1)
-                .ToList<MoveVariant>();
 
-            foreach (MoveVariant attack in potentialAttacks)
+            if(deep > 0)
             {
-                List<Vector2> availableMovePositions = new List<Vector2>();
+                List<MoveVariant> forRemove = new List<MoveVariant>();
 
-                Vector2 attackPosition = attack.Start.Position;
-                Vector2 blockPosition = attack.Blockers[0].Position;
-                Vector2 kingPosition = cellWithKing.Position;
-                Vector2 deltaAttack = attackPosition - blockPosition;
-                Vector2 deltaDefence = kingPosition - blockPosition;
-
-                int attackCounter = (int)Math.Max(Math.Abs(deltaAttack.X), Math.Abs(deltaAttack.Y));
-                int defenceCounter = (int)Math.Max(Math.Abs(deltaDefence.X), Math.Abs(deltaDefence.Y));
-
-                Vector2 directionAttack = deltaAttack / attackCounter;
-                Vector2 derectionDeffence = deltaDefence / defenceCounter;
-
-                for (int i = attackCounter; i > 0; i --)
+                foreach (var variant in _moveVariants)
                 {
-                    availableMovePositions.Add(blockPosition + directionAttack * i);
-                }
-                for (int i = 0; i < defenceCounter; i++)
-                {
-                    availableMovePositions.Add(blockPosition + derectionDeffence * i);
+                    ChessBoard checkBoard = new ChessBoard(_board.ToString());
+                    FigureMoveManager checkMoveManager = new FigureMoveManager(checkBoard, _state);
+
+                    ChessBoardCell start = checkBoard.GetCellByPosition(variant.Start.Position);
+                    ChessBoardCell end = checkBoard.GetCellByPosition(variant.End.Position);
+
+                    end.SetFigure(start.Figure);
+                    start.SetFigure(null);
+
+                    checkMoveManager.RefreshMoveVariants(deep);
+
+                    if (checkMoveManager.KingIsUnderAttack(ChessUtils.InvertColor(_state.TurnOwner)))
+                    {
+                        forRemove.Add(variant);
+                    }
                 }
 
-                List<MoveVariant> blockedMoveVariants = _moveVariants
-                    .Where(move => move.Start.Position == blockPosition)
-                    .Where(move => move.IsAvailable == true)
-                    .Where(move => !availableMovePositions.Contains(move.End.Position))
-                    .ToList<MoveVariant>();
-
-                _blockedMoveVariants.AddRange(blockedMoveVariants);
+                _moveVariants.RemoveAll(v => forRemove.Contains(v));
             }
         }
-        private void UpdateMoveVariantsAfterMove(ChessBoardCell start, ChessBoardCell end)
+        private bool KingIsUnderAttack(Color color)
         {
-            List<ChessBoardCell> cellsToUpdate = _moveVariants
-                .Where(move => move.Start == start || move.End == start || move.Start == end || move.End == end)
-                .Select(move => move.Start)
-                .Distinct()
-                .ToList<ChessBoardCell>();
-
-            if(!cellsToUpdate.Contains(start))
-            {
-                cellsToUpdate.Add(start);
-            }
-
-            if(!cellsToUpdate.Contains(end))
-            {
-                cellsToUpdate.Add(end);
-            }
-
-            _moveVariants.RemoveAll(move => cellsToUpdate.Contains(move.Start));
-            _moveVariants.AddRange(GetMoveVariantsFromCells(cellsToUpdate));
-        }
-        private bool KingIsUnderAttack(Color kingColor)
-        {
-            ChessBoardCell cellWithKing = _board.GetCellWithKing(kingColor);
-
-            List<ChessBoardCell> potentialAttackers = GetPotentialCellAttackers(cellWithKing);
-            List<MoveVariant> moveVariants = GetMoveVariantsFromCells(potentialAttackers);
-
-            return moveVariants
-                .Where(move => move.IsAvailable && move.End == cellWithKing)
-                .Count() != 0;
-        }
-        private List<ChessBoardCell> GetPotentialCellAttackers(ChessBoardCell cell)
-        {
-            return GetPotentialCellAttackMoveVariants(cell)
-                .Select(cell => cell.Start)
-                .ToList<ChessBoardCell>();
-        }
-        private List<MoveVariant> GetPotentialCellAttackMoveVariants(ChessBoardCell cell)
-        {
-            return _moveVariants
-                .Select(move => move)
-                .Where(move => move.End == cell && move.Start.Figure.Color != cell.Figure.Color)
-                .ToList<MoveVariant>();
+            ChessBoardCell cell = _board.GetCellWithKing(color);
+            return _moveVariants.Where(v => v.End == cell).Count() != 0;
         }
         private List<MoveVariant> GetMoveVariantsFromCell(ChessBoardCell startCell)
         {
@@ -225,49 +140,30 @@ namespace ChessLogic
         {
             List<MoveVariant> result = new List<MoveVariant>();
 
-            Vector2 startPosition = startCell.Position;
-
             int direction = startCell.Figure.Color == Color.White ? 1 : -1;
-            bool pawnIsOnStartPosition = startCell.Figure.Color == Color.White ? startPosition.Y == 1 : startPosition.Y == 6;
+            bool pawnIsOnStartPosition = startCell.Figure.Color == Color.White ? startCell.Position.Y == 1 : startCell.Position.Y == 6;
 
-            ChessBoardCell endCellFrontDirection = _board.GetCellByPosition(startPosition + new Vector2(0, direction));
-            ChessBoardCell endCellFrontPassDirection = _board.GetCellByPosition(startPosition + new Vector2(0, 2 * direction));
-            ChessBoardCell endCellFrontRightDirection = _board.GetCellByPosition(startPosition + new Vector2(1, direction));
-            ChessBoardCell endCellFronLeftDirection = _board.GetCellByPosition(startPosition + new Vector2(-1, direction));
+            ChessBoardCell endCellFrontDirection = _board.GetCellByPosition(startCell.Position + new Vector2(0, direction));
+            ChessBoardCell endCellPassantDirection = _board.GetCellByPosition(startCell.Position + new Vector2(0, 2 * direction));
+            ChessBoardCell endCellFrontRightDirection = _board.GetCellByPosition(startCell.Position + new Vector2(1, direction));
+            ChessBoardCell endCellFronLeftDirection = _board.GetCellByPosition(startCell.Position + new Vector2(-1, direction));
 
-            if (endCellFrontDirection != null)
+            if (endCellFrontDirection != null && endCellFrontDirection.Figure == null)
             {
-                MoveVariant moveVariant = new MoveVariant(startCell, endCellFrontDirection);
-                if(endCellFrontDirection.Figure != null)
-                {
-                    moveVariant.AddBlocker(endCellFrontDirection);
-                }
+                result.Add(new MoveVariant(startCell, endCellFrontDirection));
 
-                result.Add(moveVariant);
+                if (endCellPassantDirection != null && endCellPassantDirection.Figure == null && pawnIsOnStartPosition)
+                {
+                    result.Add(new MoveVariant(startCell, endCellPassantDirection));
+                }
             }
 
-            if (endCellFrontPassDirection != null && pawnIsOnStartPosition)
-            {
-                MoveVariant moveVariant = new MoveVariant(startCell, endCellFrontPassDirection);
-                if(endCellFrontDirection != null && endCellFrontDirection.Figure != null)
-                {
-                    moveVariant.AddBlocker(endCellFrontDirection);
-                }
-
-                if(endCellFrontPassDirection.Figure != null)
-                {
-                    moveVariant.AddBlocker(endCellFrontPassDirection);
-                }
-
-                result.Add(moveVariant);
-            }
-
-            if (endCellFrontRightDirection != null)
+            if (endCellFrontRightDirection != null && endCellFrontDirection.Figure != null && endCellFrontDirection.Figure.Color != startCell.Figure.Color)
             {
                 result.Add(new MoveVariant(startCell, endCellFrontRightDirection));
             }
 
-            if (endCellFronLeftDirection != null)
+            if (endCellFronLeftDirection != null && endCellFronLeftDirection.Figure != null && endCellFronLeftDirection.Figure.Color != startCell.Figure.Color)
             {
                 result.Add(new MoveVariant(startCell, endCellFronLeftDirection));
             }
@@ -277,34 +173,29 @@ namespace ChessLogic
         private List<MoveVariant> GetKnightMoveVariantsFromCell(ChessBoardCell startCell)
         {
             List<MoveVariant> result = new List<MoveVariant>();
-
-            List<Vector2> directions = new List<Vector2>();
-            List<ChessBoardCell> endCells = new List<ChessBoardCell>();
-
-            directions.Add(new Vector2(1, 2));
-            directions.Add(new Vector2(2, 1));
-            directions.Add(new Vector2(1, -2));
-            directions.Add(new Vector2(2, -1));
-            directions.Add(new Vector2(-1, 2));
-            directions.Add(new Vector2(-2, 1));
-            directions.Add(new Vector2(-1, -2));
-            directions.Add(new Vector2(-2, -1));
-
-            foreach (Vector2 direction in directions)
+            List<ChessBoardCell> endCells = new List<ChessBoardCell>()
             {
-                endCells.Add(_board.GetCellByPosition(startCell.Position + direction));
-            }
+                _board.GetCellByPosition(startCell.Position + new Vector2(1, 2)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(2, 1)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(1, -2)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(2, -1)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(-1, 2)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(-2, 1)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(-1, -2)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(-2, -1))
+            };
 
             foreach (ChessBoardCell endCell in endCells)
             {
                 if (endCell != null) {
-                    MoveVariant moveVariant = new MoveVariant(startCell, endCell);
-                    if (endCell.Figure != null && endCell.Figure.Color == startCell.Figure.Color)
+                    if(endCell.Figure == null)
                     {
-                        moveVariant.AddBlocker(endCell);
+                        result.Add(new MoveVariant(startCell, endCell));
                     }
-
-                    result.Add(moveVariant);
+                    else if (endCell.Figure != null && endCell.Figure.Color != startCell.Figure.Color)
+                    {
+                        result.Add(new MoveVariant(startCell, endCell));
+                    }
                 }
             }
 
@@ -313,18 +204,16 @@ namespace ChessLogic
         private List<MoveVariant> GetBishopMoveVariantsFromCell(ChessBoardCell startCell)
         {
             List<MoveVariant> result = new List<MoveVariant>();
-
-            List<Vector2> directions = new List<Vector2>();
-
-            directions.Add(new Vector2(1, 1));
-            directions.Add(new Vector2(1, -1));
-            directions.Add(new Vector2(-1, 1));
-            directions.Add(new Vector2(-1, -1));
+            List<Vector2> directions = new List<Vector2>
+            {
+                new Vector2(1, 1),
+                new Vector2(1, -1),
+                new Vector2(-1, 1),
+                new Vector2(-1, -1)
+            };
 
             foreach (Vector2 direction in directions)
             {
-                List<ChessBoardCell> figuresOnThePath = new List<ChessBoardCell>();
-
                 for (int i = 1; i < 8; i++)
                 {
                     ChessBoardCell endCell = _board.GetCellByPosition(startCell.Position + direction * i);
@@ -334,20 +223,19 @@ namespace ChessLogic
                     }
                     else
                     {
-                        MoveVariant moveVariant = new MoveVariant(startCell, endCell);
-                        moveVariant.AddBlockersList(figuresOnThePath);
-
-                        if (endCell.Figure != null)
+                        if (endCell.Figure == null)
                         {
-                            if (endCell.Figure.Color == startCell.Figure.Color)
-                            {
-                                moveVariant.AddBlocker(endCell);
-                            }
-
-                            figuresOnThePath.Add(endCell);
+                            result.Add(new MoveVariant(startCell, endCell));
                         }
-
-                        result.Add(moveVariant);
+                        else if (endCell.Figure.Color != startCell.Figure.Color)
+                        {
+                            result.Add(new MoveVariant(startCell, endCell));
+                            break;
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                 }
             }
@@ -358,17 +246,16 @@ namespace ChessLogic
         {
             List<MoveVariant> result = new List<MoveVariant>();
 
-            List<Vector2> directions = new List<Vector2>();
-
-            directions.Add(new Vector2(1, 0));
-            directions.Add(new Vector2(0, 1));
-            directions.Add(new Vector2(-1, 0));
-            directions.Add(new Vector2(0, -1));
+            List<Vector2> directions = new List<Vector2>
+            {
+                new Vector2(1, 0),
+                new Vector2(0, 1),
+                new Vector2(-1, 0),
+                new Vector2(0, -1)
+            };
 
             foreach (Vector2 direction in directions)
             {
-                List<ChessBoardCell> figuresOnThePath = new List<ChessBoardCell>();
-
                 for (int i = 1; i < 8; i++)
                 {
                     ChessBoardCell endCell = _board.GetCellByPosition(startCell.Position + direction * i);
@@ -378,20 +265,19 @@ namespace ChessLogic
                     }
                     else
                     {
-                        MoveVariant moveVariant = new MoveVariant(startCell, endCell);
-                        moveVariant.AddBlockersList(figuresOnThePath);
-
-                        if (endCell.Figure != null)
+                        if (endCell.Figure == null)
                         {
-                            if (endCell.Figure.Color == startCell.Figure.Color)
-                            {
-                                moveVariant.AddBlocker(endCell);
-                            }
-
-                            figuresOnThePath.Add(endCell);
+                            result.Add(new MoveVariant(startCell, endCell));
                         }
-
-                        result.Add(moveVariant);
+                        else if (endCell.Figure.Color != startCell.Figure.Color)
+                        {
+                            result.Add(new MoveVariant(startCell, endCell));
+                            break;
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                 }
             }
@@ -401,36 +287,30 @@ namespace ChessLogic
         private List<MoveVariant> GetKingMoveVariantsFromCell(ChessBoardCell startCell)
         {
             List<MoveVariant> result = new List<MoveVariant>();
-
-            List<Vector2> directions = new List<Vector2>();
-            List<ChessBoardCell> endCells = new List<ChessBoardCell>();
-
-            directions.Add(new Vector2(0, 1));
-            directions.Add(new Vector2(1, 1));
-            directions.Add(new Vector2(1, 0));
-            directions.Add(new Vector2(1, -1));
-            directions.Add(new Vector2(-1, 0));
-            directions.Add(new Vector2(-1, -1));
-            directions.Add(new Vector2(-1, 0));
-            directions.Add(new Vector2(1, -1));
-
-            foreach (Vector2 direction in directions)
+            List<ChessBoardCell> endCells = new List<ChessBoardCell>()
             {
-                endCells.Add(_board.GetCellByPosition(startCell.Position + direction));
-            }
+                _board.GetCellByPosition(startCell.Position + new Vector2(0, 1)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(1, 1)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(1, 0)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(1, -1)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(-0, -1)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(-1, -1)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(-1, 0)),
+                _board.GetCellByPosition(startCell.Position + new Vector2(-1, 1))
+            };
 
             foreach (ChessBoardCell endCell in endCells)
             {
-                if (endCell != null) 
+                if (endCell != null)
                 {
-                    MoveVariant moveVariant = new MoveVariant(startCell, endCell);
-
-                    if (endCell.Figure != null && endCell.Figure.Color == startCell.Figure.Color)
+                    if (endCell.Figure == null)
                     {
-                        moveVariant.AddBlocker(endCell);
+                        result.Add(new MoveVariant(startCell, endCell));
                     }
-
-                    result.Add(moveVariant);
+                    else if (endCell.Figure != null && endCell.Figure.Color != startCell.Figure.Color)
+                    {
+                        result.Add(new MoveVariant(startCell, endCell));
+                    }
                 }
             }
 
@@ -469,16 +349,12 @@ namespace ChessLogic
                 // _state.UpdateState(false);
 
                 _history.Push(move);
-
-                UpdateMoveVariantsAfterMove(move.Start, move.End);
-                RefreshBlockedMoveVariants();
-
+                RefreshMoveVariants(2);
                 return true;
             }
 
             return false;
         }
-
         internal bool MakeMove(string path)
         {
             ChessBoardCell start = _board.GetCellByAddress(path.Substring(0, 2));
@@ -503,12 +379,11 @@ namespace ChessLogic
        private bool MoveIsReal(FigureMove move)
        {
             MoveVariant variant = _moveVariants
-                .Where(v => v.Start == move.Start)
-                .Where(v => v.End == move.End)
-                .Where(v => v.IsAvailable)
+                .Where(v => v.Start == move.Start && v.End == move.End)
                 .FirstOrDefault();
 
-            return !variant.Equals(new MoveVariant()) && !_blockedMoveVariants.Contains(variant);
+
+            return !variant.Equals(new MoveVariant());
        }
     }
 
@@ -523,6 +398,10 @@ namespace ChessLogic
             _board = new ChessBoard(fen);
             _state = new ChessGameState(fen);
             _moveManager = new FigureMoveManager(_board, _state);
+
+
+            _moveManager.RefreshMoveVariants(2);
+
         }
         public Figure GetFigureAt(Vector2 position)
         {
@@ -624,7 +503,9 @@ namespace ChessLogic
         }
         public override string ToString()
         {
-            return $"{Color.ToString()} {Type.ToString()}";
+            char c = (char)Type;
+            c = Color == Color.White ? Char.ToLower(c) : char.ToUpper(c);
+            return c.ToString();
         }
     }
 
@@ -634,36 +515,29 @@ namespace ChessLogic
         internal ChessBoard(string fen)
         {
             fen = fen.Split(' ')[0];
-            string[] lines = fen.Split('/');
 
-            Cells = new Dictionary<Vector2, ChessBoardCell>();
-            for (int i = 0; i < 8; i++)
+            string data = fen;
+            for (int i = 8; i > 1; i--)
             {
-                for (int j = 0; j < 8; j++)
-                {
-                    ChessBoardCell cell = new ChessBoardCell(new Vector2(i, j));
-                    Cells.Add(cell.Position, cell);
-                }
+                data = data.Replace(i.ToString(), (i - 1).ToString() + "1");
             }
 
-            for (int y = 0; y < lines.Length; y++)
-            {
-                int skipped = 0;
+            string[] lines = data.Split('/');
 
+            Cells = new Dictionary<Vector2, ChessBoardCell>();
+            for (int y = 0; y < 8; y++)
+            {
                 for (int x = 0; x < 8; x++)
                 {
-                    char symbol = lines[y][x - skipped];
-                    Color color = Char.IsUpper(symbol) ? Color.Black : Color.White;
+                    ChessBoardCell cell = new ChessBoardCell(new Vector2(x, y));
+                    Cells.Add(cell.Position, cell);
 
-                    if (Int32.TryParse(symbol.ToString(), out int num))
-                    {
-                        x += num - 1;
-                        skipped += num - 1;
-                    }
-                    else
+                    char symbol = lines[y][x];
+
+                    if (!char.IsDigit(symbol))
                     {
                         FigureType type = (FigureType)Char.ToLower(symbol);
-                        ChessBoardCell cell = GetCellByPosition(new Vector2(x, y));
+                        Color color = Char.IsUpper(symbol) ? Color.Black : Color.White;
                         cell.SetFigure(new Figure(type, color));
                     }
                 }
@@ -699,6 +573,32 @@ namespace ChessLogic
                 .Where(cell => cell.Figure != null)
                 .ToList<ChessBoardCell>();
         }
+        public override string ToString()
+        {
+            string result = "";
+
+            for (int y = 0; y < 8; y++)
+            {
+                if(y != 0)
+                {
+                    result += "/";
+                }
+
+                for (int x = 0; x < 8; x++)
+                {
+                    ChessBoardCell cell = Cells[new Vector2(x, y)];
+                    result += cell.Figure == null ? "1" : cell.Figure.ToString();
+                }
+            }
+
+            string template = "11111111";
+            for (int i = 8; i > 1; i--)
+            {
+                result = result.Replace(template.Substring(0, i), i.ToString());
+            }
+
+            return result;
+        }
     }
 
     internal class ChessBoardCell
@@ -717,7 +617,7 @@ namespace ChessLogic
         }
         public override string ToString()
         {
-            return $"{Address} {Figure.ToString()}";
+            return $"{Address} {Figure}";
         }
     }
 
@@ -730,18 +630,19 @@ namespace ChessLogic
             int x = (Int32)position.X;
             int y = (Int32)position.Y;
 
-            if(x >= 0 && x <= 7 && y >= 0 && y <= 7)
+            if(x >= 0 && x < 8 && y >= 0 && y < 8)
             {
-                string[] conformity = new string[8];
-                conformity[0] = "a";
-                conformity[1] = "b";
-                conformity[2] = "c";
-                conformity[3] = "d";
-                conformity[4] = "e";
-                conformity[5] = "f";
-                conformity[6] = "g";
-                conformity[7] = "h";
-
+                string[] conformity = new string[8]
+                {
+                    "a",
+                    "b",
+                    "c",
+                    "d",
+                    "e",
+                    "f",
+                    "g",
+                    "h"
+                };
                 result = conformity[x] + (y + 1).ToString();
             }
 
@@ -749,25 +650,26 @@ namespace ChessLogic
         }
         internal static Vector2 GetPositionFromAddress(string address)
         {
-            Vector2 result = new Vector2(-1, -1);
+            Vector2 result = new Vector2(-1);
             
             if(address.Length == 2)
             {
                 char x = address[0];
-                int y = -1;
-                Int32.TryParse(address[1].ToString(), out y);
+                Int32.TryParse(address[1].ToString(), out int y);
 
                 if (x >= 'a' && x <= 'h' && y >= 1 && y <= 8)
                 {
-                    Dictionary<char, int> conformity = new Dictionary<char, int>();
-                    conformity.Add('a', 0);
-                    conformity.Add('b', 1);
-                    conformity.Add('c', 2);
-                    conformity.Add('d', 3);
-                    conformity.Add('e', 4);
-                    conformity.Add('f', 5);
-                    conformity.Add('g', 6);
-                    conformity.Add('h', 7);
+                    Dictionary<char, int> conformity = new Dictionary<char, int>
+                    {
+                        { 'a', 0 },
+                        { 'b', 1 },
+                        { 'c', 2 },
+                        { 'd', 3 },
+                        { 'e', 4 },
+                        { 'f', 5 },
+                        { 'g', 6 },
+                        { 'h', 7 }
+                    };
 
                     result = new Vector2(conformity[x], y - 1);
                 }
