@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using System.Numerics;
 using System.Threading.Tasks;
 using ChessLogic;
@@ -63,7 +64,7 @@ namespace ChatClient
                 {
                     LoadGame(commandArgs);
                 }
-                else if(command == "loadtemplate")
+                else if(command == "template")
                 {
                     string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
                     if (commandArgs == "1")
@@ -106,31 +107,29 @@ namespace ChatClient
 
         static private void DrawGameBoard()
         {
-            Console.WriteLine("  +---------------+");
-
-            for (int y = 7; y >= 0; y--)
+            var boardTextTuple = game.GetBoardTextTuple();
+            foreach(var t in boardTextTuple)
             {
-                Console.Write($" {y + 1}|");
-                for (int x = 0; x < 8; x++)
-                {
-                    Figure figure = game.GetFigureAt(new Vector2(x, y));
-                    if (figure == null)
-                    {
-                        Console.Write(" ");
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = figure.Color == Color.White ? ConsoleColor.White : ConsoleColor.DarkRed;
-                        Console.Write((Char)figure.Type);
-                        Console.ResetColor();
-                    }
-                    Console.Write("|");
-                }
-                Console.Write("\n");
-            }
+                KnownColor tc = t.Item1;
+                ConsoleColor c;
 
-            Console.WriteLine("  +---------------+");
-            Console.WriteLine("   a b c d e f g h");
+                if (tc == KnownColor.White)
+                {
+                    c = ConsoleColor.White;
+                }
+                else if (tc == KnownColor.DarkRed)
+                {
+                    c = ConsoleColor.DarkRed;
+                }
+                else
+                {
+                    c = ConsoleColor.DarkGray;
+                }
+
+                Console.ForegroundColor = c;
+                Console.Write(t.Item2);
+                Console.ResetColor();
+            }
         }
 
         static private void SendMessage(string message)
