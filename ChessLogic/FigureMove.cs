@@ -16,7 +16,7 @@ namespace ChessLogic
 
         public override string ToString()
         {
-            return $"from {Start.Address} to {End.Address}";
+            return $"{Start}{End}";
         }
     }
 }

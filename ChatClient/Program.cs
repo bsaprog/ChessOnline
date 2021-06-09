@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using ChessLogic;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -45,7 +46,6 @@ namespace ChatClient
                     if (game.MakeMove(commandArgs))
                     {
                         DrawGameInfo();
-                        DrawGameBoard();
                     }
                     else
                     {
@@ -73,9 +73,21 @@ namespace ChatClient
                     }
                     else if(commandArgs == "2")
                     {
-                        fen = "2k5/2pr4/8/8/6BB/8/8/K7 w - - 0 1";
+                        fen = "2k5/2pr4/8/8/6BQ/8/8/K7 w - - 0 1";
+                    }
+                    else if (commandArgs == "3")
+                    {
+                        fen = "8/8/8/p1PppppP/Pkp1PP1P/6K1/8/8 w - - 0 1";
                     }
                     LoadGame(fen);
+                }
+                else if(command == "randommove")
+                {
+                    while(game.MakeRandomMove() )
+                    {
+                        Thread.Sleep(400);
+                        DrawGameInfo();
+                    }
                 }
             }
         }
@@ -94,25 +106,19 @@ namespace ChatClient
         {
             game = new ChessGame();
             DrawGameInfo();
-            DrawGameBoard();
         }
 
         static private void LoadGame(string fen = "")
         {
             game = new ChessGame(fen);
             DrawGameInfo();
-            DrawGameBoard();
         }
 
         static private void DrawGameInfo()
         {
-            Console.WriteLine(game.GetStateString());
-        }
 
-        static private void DrawGameBoard()
-        {
-            var boardTextTuple = game.GetBoardTextTuple();
-            foreach(var t in boardTextTuple)
+            var boardTextTuple = game.GetGameTextTuple();
+            foreach (var t in boardTextTuple)
             {
                 KnownColor tc = t.Item1;
                 ConsoleColor c;

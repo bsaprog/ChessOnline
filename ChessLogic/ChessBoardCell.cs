@@ -4,8 +4,8 @@ namespace ChessLogic
 {
     internal class ChessBoardCell
     {
-        internal Vector2 Position { get; private set; }
-        internal string Address { get; private set; }
+        internal readonly Vector2 Position;
+        internal readonly string Address;
         internal Figure Figure { get; private set; }
         
         internal ChessBoardCell(Vector2 position)
@@ -21,7 +21,7 @@ namespace ChessLogic
         
         public override string ToString()
         {
-            return $"{Address} {Figure}";
+            return $"{Address}";
         }
     }
 }

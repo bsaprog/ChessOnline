@@ -12,6 +12,7 @@ namespace ChessLogic
             Type = type;
             Color = color;
         }
+
         public override string ToString()
         {
             char c = (char)Type;
