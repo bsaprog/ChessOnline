@@ -81,5 +81,10 @@ namespace ChessLogic
 
             return result;
         }
+
+        internal static string GenerateFen(ChessBoard board, ChessGameState state)
+        {
+            return board.ToString() + " " + state.ToString();
+        }
     }
 }

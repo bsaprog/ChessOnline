@@ -4,7 +4,6 @@ using System.Numerics;
 
 namespace ChessLogic
 {
-
     internal struct ChessGameState
     {
         internal KnownColor TurnOwner;
@@ -92,7 +91,7 @@ namespace ChessLogic
                 castling = "-";
             }
 
-            if(PawnOnThePassant.Equals(new PawnOnThePassant()))
+            if(PawnOnThePassant.HitPosition == new Vector2(-1))
             {
                 passant = "-";
             }

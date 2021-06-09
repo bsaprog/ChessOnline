@@ -71,6 +71,10 @@ namespace ChatClient
                     {
                         fen = "kn2r1R1/pb6/8/3Q4/8/8/8/2K5 w - - 0 1";
                     }
+                    else if(commandArgs == "2")
+                    {
+                        fen = "2k5/2pr4/8/8/6BB/8/8/K7 w - - 0 1";
+                    }
                     LoadGame(fen);
                 }
             }

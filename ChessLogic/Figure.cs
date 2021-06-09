@@ -30,5 +30,4 @@ namespace ChessLogic
         Queen = 'q',
         King = 'k'
     }
-
 }

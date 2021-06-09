@@ -60,11 +60,11 @@ namespace ChessLogic
             return GetCellByPosition(position);
         }
 
-        internal ChessBoardCell GetCellWithKing(KnownColor kingColor)
+        internal ChessBoardCell GetCellWithKing(KnownColor color)
         {
             return Cells
                 .Select(pair => pair.Value)
-                .Where(cell => cell.Figure != null && cell.Figure.Type == FigureType.King && cell.Figure.Color == kingColor)
+                .Where(cell => cell.Figure != null && cell.Figure.Type == FigureType.King && cell.Figure.Color == color)
                 .First();
         }
         
@@ -73,6 +73,14 @@ namespace ChessLogic
             return Cells
                 .Select(pair => pair.Value)
                 .Where(cell => cell.Figure != null)
+                .ToList();
+        }
+
+        internal List<ChessBoardCell> GetCellsWithFiguresOfColor(KnownColor color)
+        {
+            return Cells
+                .Select(pair => pair.Value)
+                .Where(cell => cell.Figure != null && cell.Figure.Color == color)
                 .ToList();
         }
         
