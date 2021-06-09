@@ -13,6 +13,11 @@ namespace ChessLogic
             Color = color;
         }
 
+        internal void Transform(FigureType type)
+        {
+            Type = type;
+        }
+
         public override string ToString()
         {
             char c = (char)Type;

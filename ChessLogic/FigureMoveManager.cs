@@ -29,6 +29,10 @@ namespace ChessLogic
             {
                 return false;
             }
+            if(State.RuleOf50 == 50)
+            {
+                return false;
+            }
 
             Random r = new Random();
             int id = r.Next(0, _moveVariants.Count() - 1);
@@ -80,11 +84,54 @@ namespace ChessLogic
             state.Turn += State.TurnOwner == KnownColor.Black ? 1 : 0;
             state.TurnOwner = ChessUtils.InvertColor(State.TurnOwner);
 
+            if(move.Start.Figure.Type == FigureType.King)
+            {
+                if(move.Start.Figure.Color == KnownColor.Black)
+                {
+                    state.BlackKingCastlingAvailable = false;
+                    state.BlackQueenCastlingAvailable = false;
+                }
+                else if(move.Start.Figure.Color == KnownColor.White)
+                {
+                    state.WhiteKingCastlingAvailable = false;
+                    state.WhiteQueenCastlingAvailable = false;
+                }
+            }
+            else if(move.Start.Figure.Type == FigureType.Rook)
+            {
+                if(move.Start.Figure.Color == KnownColor.Black)
+                {
+                    if(move.Start.Position.X == 0)
+                    {
+                        state.BlackQueenCastlingAvailable = false;
+                    }
+                    else if(move.Start.Position.X == 7)
+                    {
+                        state.BlackKingCastlingAvailable = false;
+                    }
+                }
+                else if (move.Start.Figure.Color == KnownColor.White)
+                {
+                    if (move.Start.Position.X == 0)
+                    {
+                        state.WhiteQueenCastlingAvailable = false;
+                    }
+                    else if (move.Start.Position.X == 7)
+                    {
+                        state.WhiteKingCastlingAvailable = false;
+                    }
+                }
+            }
+
             State = state;
 
             move.End.SetFigure(move.Start.Figure);
             move.Start.SetFigure(null);
- 
+
+            if(move.End.Figure.Type == FigureType.Pawn && (move.End.Position.Y == 0 || move.End.Position.Y == 7)) {
+                move.End.Figure.Transform(FigureType.Queen);
+            }
+
             _history.Push(move);
             RefreshMoveVariants();
             return true;

@@ -85,7 +85,7 @@ namespace ChatClient
                 {
                     while(game.MakeRandomMove() )
                     {
-                        Thread.Sleep(400);
+                        Thread.Sleep(600);
                         DrawGameInfo();
                     }
                 }
