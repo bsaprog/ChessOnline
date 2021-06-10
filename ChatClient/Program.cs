@@ -79,6 +79,14 @@ namespace ChatClient
                     {
                         fen = "8/8/8/p1PppppP/Pkp1PP1P/6K1/8/8 w - - 0 1";
                     }
+                    else if(commandArgs == "4")
+                    {
+                        fen = "rnbqkbnr/8/8/8/1P2pP2/8/8/RNBQKBNR w KQkq f6 0 1";
+                    }
+                    else if (commandArgs == "5")
+                    {
+                        fen = "r3k2r/pppRpppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+                    }
                     LoadGame(fen);
                 }
                 else if(command == "randommove")

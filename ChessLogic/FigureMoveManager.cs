@@ -25,11 +25,11 @@ namespace ChessLogic
 
         internal bool MakeRandomMove()
         {
-            if(_moveVariants.Count() == 0)
+            if (_moveVariants.Count() == 0)
             {
                 return false;
             }
-            if(State.RuleOf50 == 50)
+            if (State.RuleOf50 == 50)
             {
                 return false;
             }
@@ -56,7 +56,7 @@ namespace ChessLogic
                 .Where(v => v.Start == move.Start && v.End == move.End)
                 .FirstOrDefault();
 
-            if(variant.Equals(new FigureMove())) 
+            if (variant.Equals(new FigureMove()))
             {
                 return false;
             }
@@ -73,9 +73,9 @@ namespace ChessLogic
                 potpPosition = new Vector2(-1);
             }
 
-            if (move.Start.Figure.Type == FigureType.Pawn && move.End.Figure == null && move.Start.Position.X != move.End.Position.X)
+            if (move.Start.Figure.Type == FigureType.Pawn && move.End.Position == State.PawnOnThePassant.HitPosition)
             {
-                _board.GetCellByPosition(move.End.Position + new Vector2(0, 1 * -1 * direction)).SetFigure(null);
+                _board.GetCellByPosition(State.PawnOnThePassant.PawnPosition).SetFigure(null);
             }
 
             var state = new ChessGameState(State);
@@ -84,28 +84,28 @@ namespace ChessLogic
             state.Turn += State.TurnOwner == KnownColor.Black ? 1 : 0;
             state.TurnOwner = ChessUtils.InvertColor(State.TurnOwner);
 
-            if(move.Start.Figure.Type == FigureType.King)
+            if (move.Start.Figure.Type == FigureType.King)
             {
-                if(move.Start.Figure.Color == KnownColor.Black)
+                if (move.Start.Figure.Color == KnownColor.Black)
                 {
                     state.BlackKingCastlingAvailable = false;
                     state.BlackQueenCastlingAvailable = false;
                 }
-                else if(move.Start.Figure.Color == KnownColor.White)
+                else if (move.Start.Figure.Color == KnownColor.White)
                 {
                     state.WhiteKingCastlingAvailable = false;
                     state.WhiteQueenCastlingAvailable = false;
                 }
             }
-            else if(move.Start.Figure.Type == FigureType.Rook)
+            else if (move.Start.Figure.Type == FigureType.Rook)
             {
-                if(move.Start.Figure.Color == KnownColor.Black)
+                if (move.Start.Figure.Color == KnownColor.Black)
                 {
-                    if(move.Start.Position.X == 0)
+                    if (move.Start.Position.X == 0)
                     {
                         state.BlackQueenCastlingAvailable = false;
                     }
-                    else if(move.Start.Position.X == 7)
+                    else if (move.Start.Position.X == 7)
                     {
                         state.BlackKingCastlingAvailable = false;
                     }
@@ -128,7 +128,23 @@ namespace ChessLogic
             move.End.SetFigure(move.Start.Figure);
             move.Start.SetFigure(null);
 
-            if(move.End.Figure.Type == FigureType.Pawn && (move.End.Position.Y == 0 || move.End.Position.Y == 7)) {
+            if (move.End.Figure.Type == FigureType.King)
+            {
+                float delta = move.Start.Position.X - move.End.Position.X;
+                if (Math.Abs(delta) == 2)
+                {
+                    Vector2 rockStartPosition = delta > 0 ? new Vector2(0, move.Start.Position.Y) : new Vector2(7, move.Start.Position.Y);
+                    Vector2 rockEndPosition = delta > 0 ? new Vector2(move.Start.Position.X - 1, move.Start.Position.Y) : new Vector2(move.Start.Position.X + 1, move.Start.Position.Y);
+
+                    var rockStartCell = _board.GetCellByPosition(rockStartPosition);
+                    var rockEndCell = _board.GetCellByPosition(rockEndPosition);
+
+                    rockEndCell.SetFigure(rockStartCell.Figure);
+                    rockStartCell.SetFigure(null);
+                }
+            }
+
+            if (move.End.Figure.Type == FigureType.Pawn && (move.End.Position.Y == 0 || move.End.Position.Y == 7)) {
                 move.End.Figure.Transform(FigureType.Queen);
             }
 
@@ -157,6 +173,24 @@ namespace ChessLogic
                 ChessBoardCell start = nextBoard.GetCellByPosition(variant.Start.Position);
                 ChessBoardCell end = nextBoard.GetCellByPosition(variant.End.Position);
 
+
+                if (start.Figure.Type == FigureType.King)
+                {
+                    float delta = start.Position.X - end.Position.X;
+                    if (Math.Abs(delta) == 2)
+                    {
+                        // Castling
+                        Vector2 rockStartPosition = delta > 0 ? new Vector2(0, start.Position.Y) : new Vector2(7, start.Position.Y);
+                        Vector2 rockEndPosition = delta > 0 ? new Vector2(start.Position.X - 1, start.Position.Y) : new Vector2(start.Position.X + 1, start.Position.Y);
+
+                        var rockStartCell = nextBoard.GetCellByPosition(rockStartPosition);
+                        var rockEndCell = nextBoard.GetCellByPosition(rockEndPosition);
+
+                        rockEndCell.SetFigure(rockStartCell.Figure);
+                        rockStartCell.SetFigure(null);
+                    }
+                }
+
                 end.SetFigure(start.Figure);
                 start.SetFigure(null);
 
@@ -164,6 +198,24 @@ namespace ChessLogic
                 if (KingIsUnderAttack(nextBoard, enemyMoveVariants, State.TurnOwner))
                 {
                     forRemove.Add(variant);
+                }
+
+                if (end.Figure.Type == FigureType.King)
+                {
+                    float delta = start.Position.X - end.Position.X;
+                    if (Math.Abs(delta) == 2)
+                    {
+                        Vector2 rockStartPosition = delta > 0 ? new Vector2(0, start.Position.Y) : new Vector2(7, start.Position.Y);
+                        Vector2 rockEndPosition = delta > 0 ? new Vector2(start.Position.X - 1, start.Position.Y) : new Vector2(start.Position.X + 1, start.Position.Y);
+
+                        var rockStartCell = nextBoard.GetCellByPosition(rockStartPosition);
+                        var rockEndCell = nextBoard.GetCellByPosition(rockEndPosition);
+
+                        if (CellIsUnderAttack(nextBoard, enemyMoveVariants, rockEndCell))
+                        {
+                            forRemove.Add(variant);
+                        }
+                    }
                 }
             }
 
@@ -176,6 +228,11 @@ namespace ChessLogic
         private bool KingIsUnderAttack(ChessBoard board, List<FigureMove> moveVariants, KnownColor color)
         {
             ChessBoardCell cell = board.GetCellWithKing(color);
+            return CellIsUnderAttack(board, moveVariants, cell);
+        }
+
+        private bool CellIsUnderAttack(ChessBoard board, List<FigureMove> moveVariants, ChessBoardCell cell)
+        {
             return moveVariants
                 .Where(v => v.End == cell)
                 .Count() != 0;
@@ -268,6 +325,16 @@ namespace ChessLogic
             }
 
             if (endCellFronLeftDirection != null && endCellFronLeftDirection.Figure != null && endCellFronLeftDirection.Figure.Color != startCell.Figure.Color)
+            {
+                result.Add(new FigureMove(startCell, endCellFronLeftDirection));
+            }
+
+            if (endCellFrontRightDirection != null && endCellFrontRightDirection.Position == State.PawnOnThePassant.HitPosition)
+            {
+                result.Add(new FigureMove(startCell, endCellFrontRightDirection));
+            }
+
+            if (endCellFronLeftDirection != null && endCellFronLeftDirection.Position == State.PawnOnThePassant.HitPosition)
             {
                 result.Add(new FigureMove(startCell, endCellFronLeftDirection));
             }
@@ -396,17 +463,16 @@ namespace ChessLogic
         private List<FigureMove> GetKingMoveVariantsFromCell(ChessBoard board, ChessBoardCell startCell)
         {
             List<FigureMove> result = new List<FigureMove>();
-            List<ChessBoardCell> endCells = new List<ChessBoardCell>()
-            {
-                board.GetCellByPosition(startCell.Position + new Vector2(0, 1)),
-                board.GetCellByPosition(startCell.Position + new Vector2(1, 1)),
-                board.GetCellByPosition(startCell.Position + new Vector2(1, 0)),
-                board.GetCellByPosition(startCell.Position + new Vector2(1, -1)),
-                board.GetCellByPosition(startCell.Position + new Vector2(-0, -1)),
-                board.GetCellByPosition(startCell.Position + new Vector2(-1, -1)),
-                board.GetCellByPosition(startCell.Position + new Vector2(-1, 0)),
-                board.GetCellByPosition(startCell.Position + new Vector2(-1, 1))
-            };
+            List<ChessBoardCell> endCells = new List<ChessBoardCell>();
+           
+            endCells.Add(board.GetCellByPosition(startCell.Position + new Vector2(0, 1)));
+            endCells.Add(board.GetCellByPosition(startCell.Position + new Vector2(1, 1)));
+            endCells.Add(board.GetCellByPosition(startCell.Position + new Vector2(1, 0)));
+            endCells.Add(board.GetCellByPosition(startCell.Position + new Vector2(1, -1)));
+            endCells.Add(board.GetCellByPosition(startCell.Position + new Vector2(-0, -1)));
+            endCells.Add(board.GetCellByPosition(startCell.Position + new Vector2(-1, -1)));
+            endCells.Add(board.GetCellByPosition(startCell.Position + new Vector2(-1, 0)));
+            endCells.Add(board.GetCellByPosition(startCell.Position + new Vector2(-1, 1)));
 
             foreach (ChessBoardCell endCell in endCells)
             {
@@ -418,6 +484,63 @@ namespace ChessLogic
                     }
                     else if (endCell.Figure != null && endCell.Figure.Color != startCell.Figure.Color)
                     {
+                        result.Add(new FigureMove(startCell, endCell));
+                    }
+                }
+            }
+
+            if(startCell.Figure.Color == KnownColor.White)
+            {
+                if(State.WhiteQueenCastlingAvailable)
+                {
+                    ChessBoardCell rockcCell = _board.GetCellByPosition(new Vector2(0, startCell.Position.Y));
+                    int distance = (int)(startCell.Position.X - rockcCell.Position.X);
+                    bool available = true;
+
+                    while (distance > 1)
+                    {
+                        distance -= 1;
+                        var v = new Vector2(rockcCell.Position.X + distance, startCell.Position.Y);
+                        var cell = _board.GetCellByPosition(v);
+                        if(cell.Figure != null)
+                        {
+                            available = false;
+                            break;
+                        }
+                    }
+
+                    if(available)
+                    {
+                        var endPosition = new Vector2(startCell.Position.X - 2, startCell.Position.Y);
+                        var endCell = _board.GetCellByPosition(endPosition);
+
+                        result.Add(new FigureMove(startCell, endCell));
+                    }
+                }
+                
+                if(State.WhiteKingCastlingAvailable)
+                {
+                    ChessBoardCell rockcCell = _board.GetCellByPosition(new Vector2(7, startCell.Position.Y));
+                    int distance = (int)(rockcCell.Position.X - startCell.Position.X);
+                    bool available = true;
+
+                    while (distance > 1)
+                    {
+                        distance -= 1;
+                        var v = new Vector2(startCell.Position.X + distance, startCell.Position.Y);
+                        var cell = _board.GetCellByPosition(v);
+                        if (cell.Figure != null)
+                        {
+                            available = false;
+                            break;
+                        }
+                    }
+
+                    if (available)
+                    {
+                        var endPosition = new Vector2(startCell.Position.X + 2, startCell.Position.Y);
+                        var endCell = _board.GetCellByPosition(endPosition);
+
                         result.Add(new FigureMove(startCell, endCell));
                     }
                 }

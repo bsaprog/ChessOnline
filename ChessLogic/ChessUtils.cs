@@ -91,17 +91,7 @@ namespace ChessLogic
         {
             var result = new List<(KnownColor, string)>();
 
-            string stateString = 
-                $"FEN: {GenerateFen(board, state)}\n" +
-                $"Turn #{state.Turn}. Turn owner: {state.TurnOwner}. Rule of 50: {state.RuleOf50}\n" +
-                $"CastlingAvailable:\n" +
-                $"  White King: {state.WhiteKingCastlingAvailable}\n" +
-                $"  White Queen: {state.WhiteQueenCastlingAvailable}\n" +
-                $"  Black King: {state.BlackKingCastlingAvailable}\n" +
-                $"  Black Queen: {state.BlackQueenCastlingAvailable}\n" +
-                $"Pawn on the pass: {GetAddresFromPosition(state.PawnOnThePassant.HitPosition)}\n";
-
-            result.Add((KnownColor.DarkGray, stateString));
+            result.Add((KnownColor.DarkGray, $"FEN: {GenerateFen(board, state)}\n"));
             result.Add((KnownColor.DarkGray, "  +---------------+\n"));
 
             for (int y = 8; y > 0; y--)
@@ -127,7 +117,6 @@ namespace ChessLogic
             result.Add((KnownColor.DarkGray, "   a b c d e f g h\n"));
 
             return result;
-
         }
     }
 }

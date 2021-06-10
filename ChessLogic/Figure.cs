@@ -3,7 +3,7 @@ using System.Drawing;
 
 namespace ChessLogic
 {
-    public class Figure
+    internal class Figure
     {
         public KnownColor Color { get; private set; }
         public FigureType Type { get; private set; }
@@ -26,7 +26,7 @@ namespace ChessLogic
         }
     }
 
-    public enum FigureType
+    internal enum FigureType
     {
         None = '.',
         Pawn = 'p',
